@@ -1,12 +1,21 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Test, PatientDetails, BillItem, PaymentDetails } from './types';
+import { Test, PatientDetails, BillItem, PaymentDetails, User } from './types';
 import { TEST_DATA, TAX_RATE } from './constants';
+import { USERS } from './users';
 import TestSelector from './components/TestSelector';
 import Bill from './components/Bill';
 import Header from './components/Header';
+import LoginPage from './components/LoginPage';
 
 const App: React.FC = () => {
+    // --- AUTHENTICATION STATE ---
+    const [currentUser, setCurrentUser] = useState<User | null>(() => {
+        const savedUser = localStorage.getItem('currentUser');
+        return savedUser ? JSON.parse(savedUser) : null;
+    });
+
+    // --- BILLING STATE ---
     const [patientDetails, setPatientDetails] = useState<PatientDetails>(() => {
         const saved = localStorage.getItem('patientDetails');
         return saved ? JSON.parse(saved) : { name: '', age: '', sex: '', refdBy: '' };
@@ -45,6 +54,15 @@ const App: React.FC = () => {
         return lastBillNumber + 1;
     });
     
+    // --- EFFECTS ---
+     useEffect(() => {
+        if (currentUser) {
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        } else {
+            localStorage.removeItem('currentUser');
+        }
+    }, [currentUser]);
+
     useEffect(() => {
         localStorage.setItem('patientDetails', JSON.stringify(patientDetails));
     }, [patientDetails]);
@@ -68,6 +86,20 @@ const App: React.FC = () => {
     useEffect(() => {
         localStorage.setItem('currentBillNumber', JSON.stringify(billNumber));
     }, [billNumber]);
+
+    // --- HANDLERS ---
+    const handleLogin = (username: string, password: string): boolean => {
+        const userInDb = USERS[username as keyof typeof USERS];
+        if (userInDb && userInDb.password === password) {
+            setCurrentUser({ username, role: userInDb.role as 'admin' | 'user' });
+            return true;
+        }
+        return false;
+    };
+
+    const handleLogout = () => {
+        setCurrentUser(null);
+    };
 
     const handleAddTest = useCallback((test: Test) => {
         setBillItems(prevItems => {
@@ -106,9 +138,13 @@ const App: React.FC = () => {
         setBillNumber(newBillNumber);
     }, [billNumber]);
 
+    if (!currentUser) {
+        return <LoginPage onLogin={handleLogin} />;
+    }
+
     return (
         <div className="min-h-screen bg-slate-100 font-sans print:bg-white">
-            <Header />
+            <Header currentUser={currentUser} onLogout={handleLogout} />
             <main className="p-4 sm:p-6 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8 print:grid-cols-1 print:p-0">
                 <div className="print:hidden">
                     <TestSelector testData={TEST_DATA} onAddTest={handleAddTest} />
@@ -129,6 +165,7 @@ const App: React.FC = () => {
                         onPaymentDetailsChange={setPaymentDetails}
                         commissionRate={commissionRate}
                         onCommissionRateChange={setCommissionRate}
+                        userRole={currentUser.role}
                     />
                 </div>
             </main>

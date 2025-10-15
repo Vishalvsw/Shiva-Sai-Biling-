@@ -25,3 +25,8 @@ export interface PaymentDetails {
     paymentMethod: 'Cash' | 'Card' | 'UPI' | 'Other' | '';
     amountPaid: number;
 }
+
+export interface User {
+    username: string;
+    role: 'admin' | 'user';
+}

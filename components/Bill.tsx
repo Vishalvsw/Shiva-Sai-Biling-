@@ -12,6 +12,7 @@ interface BillProps {
     totalDiscount: number;
     paymentDetails: PaymentDetails;
     commissionRate: number;
+    userRole: 'admin' | 'user';
     onPatientDetailsChange: (details: PatientDetails) => void;
     onRemoveItem: (testId: string) => void;
     onClearBill: () => void;
@@ -29,6 +30,7 @@ const Bill: React.FC<BillProps> = ({
     totalDiscount,
     paymentDetails,
     commissionRate,
+    userRole,
     onPatientDetailsChange, 
     onRemoveItem, 
     onClearBill,
@@ -142,18 +144,20 @@ const Bill: React.FC<BillProps> = ({
                             ))}
                         </select>
                     </div>
-                    <div className="sm:col-span-4 md:col-span-2 print:hidden">
-                        <label htmlFor="commissionRate" className="block text-sm font-medium text-slate-700">Commission (%)</label>
-                        <input 
-                            type="number" 
-                            name="commissionRate" 
-                            id="commissionRate" 
-                            value={commissionRate > 0 ? commissionRate : ''}
-                            onChange={(e) => onCommissionRateChange(parseFloat(e.target.value) || 0)}
-                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                            placeholder="0"
-                        />
-                    </div>
+                    {userRole === 'admin' && (
+                        <div className="sm:col-span-4 md:col-span-2 print:hidden">
+                            <label htmlFor="commissionRate" className="block text-sm font-medium text-slate-700">Commission (%)</label>
+                            <input 
+                                type="number" 
+                                name="commissionRate" 
+                                id="commissionRate" 
+                                value={commissionRate > 0 ? commissionRate : ''}
+                                onChange={(e) => onCommissionRateChange(parseFloat(e.target.value) || 0)}
+                                className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                placeholder="0"
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -266,7 +270,7 @@ const Bill: React.FC<BillProps> = ({
                 </div>
                 
                 {/* --- Reference Commission (Screen Only) --- */}
-                {commissionAmount > 0 && (
+                {userRole === 'admin' && commissionAmount > 0 && (
                      <div className="flex justify-end gap-4 pt-2 border-t border-dashed print:hidden">
                         <span className="text-sm font-medium text-slate-500">Reference Commission:</span>
                         <span className="text-sm font-semibold text-blue-600 w-28">
