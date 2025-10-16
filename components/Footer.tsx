@@ -13,7 +13,7 @@ const Footer: React.FC<FooterProps> = ({ labName }) => {
             <p className="mt-1">
                 Developed by{' '}
                 <a 
-                    href="http://www.vswdatasolutions" 
+                    href="http://vswdatasolutions.in" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="font-semibold text-slate-600 hover:text-blue-700"

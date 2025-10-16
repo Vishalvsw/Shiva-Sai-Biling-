@@ -14,7 +14,7 @@ const SplashScreen: React.FC<{ labName: string }> = ({ labName }) => {
             </div>
             <div className="absolute bottom-6 text-center text-white text-sm opacity-80">
                 <p>Developed by VISHAL WAGARAJ - vsw data solutions</p>
-                <p>www.vswdatasolutions</p>
+                <p>vswdatasolutions.in</p>
             </div>
         </div>
     );

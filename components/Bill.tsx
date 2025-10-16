@@ -363,7 +363,7 @@ const Bill: React.FC<BillProps> = ({
             </div>
             
              <div className="hidden print:block mt-16 text-center">
-                <p className="border-t border-dashed border-slate-400 pt-2 text-xs text-slate-600">Developed by VISHAL WAGARAJ - vsw data solutions | www.vswdatasolutions</p>
+                <p className="border-t border-dashed border-slate-400 pt-2 text-xs text-slate-600">Developed by VISHAL WAGARAJ - vsw data solutions | vswdatasolutions.in</p>
                 <p className="text-sm">--- Thank you ---</p>
             </div>
         </div>
