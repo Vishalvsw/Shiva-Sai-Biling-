@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { Test, PatientDetails, BillItem, PaymentDetails, User, SavedBill } from './types';
-import { TEST_DATA, TAX_RATE } from './constants';
+import { Test, PatientDetails, BillItem, PaymentDetails, User, SavedBill, AppSettings, TestCategory } from './types';
+import { DEFAULT_TEST_DATA, DEFAULT_SETTINGS } from './constants';
 import { USERS } from './users';
 import TestSelector from './components/TestSelector';
 import Bill from './components/Bill';
@@ -8,16 +9,42 @@ import Header from './components/Header';
 import LoginPage from './components/LoginPage';
 import History from './components/History';
 import AdminDashboard from './components/AdminDashboard';
+import BillingReports from './components/BillingReports';
+import ManageUsers from './components/ManageUsers';
+import ManageTests from './components/ManageTests';
+import BackupRestore from './components/BackupRestore';
+import Settings from './components/Settings';
+
+
+type AdminView = 'main' | 'reports' | 'users' | 'tests' | 'backup' | 'settings';
+type AppUser = { password: string; role: 'admin' | 'user' };
 
 const App: React.FC = () => {
     // --- APP STATE ---
     const [viewMode, setViewMode] = useState<'billing' | 'history' | 'dashboard'>('billing');
+    const [adminView, setAdminView] = useState<AdminView>('main');
     const [isViewingArchived, setIsViewingArchived] = useState<boolean>(false);
     
     // --- AUTHENTICATION STATE ---
     const [currentUser, setCurrentUser] = useState<User | null>(() => {
         const savedUser = localStorage.getItem('currentUser');
         return savedUser ? JSON.parse(savedUser) : null;
+    });
+
+    // --- DATA STATE ---
+    const [users, setUsers] = useState<{ [key: string]: AppUser }>(() => {
+        const saved = localStorage.getItem('appUsers');
+        return saved ? JSON.parse(saved) : USERS;
+    });
+
+    const [testData, setTestData] = useState<TestCategory[]>(() => {
+        const saved = localStorage.getItem('testData');
+        return saved ? JSON.parse(saved) : DEFAULT_TEST_DATA;
+    });
+    
+    const [settings, setSettings] = useState<AppSettings>(() => {
+        const saved = localStorage.getItem('appSettings');
+        return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
     });
 
     // --- BILLING STATE ---
@@ -73,48 +100,46 @@ const App: React.FC = () => {
         }
     }, [currentUser]);
 
-    useEffect(() => {
-        if(viewMode !== 'billing') return;
-        localStorage.setItem('patientDetails', JSON.stringify(patientDetails));
-    }, [patientDetails, viewMode]);
+    // Data persistence effects
+    useEffect(() => { localStorage.setItem('appUsers', JSON.stringify(users)); }, [users]);
+    useEffect(() => { localStorage.setItem('testData', JSON.stringify(testData)); }, [testData]);
+    useEffect(() => { localStorage.setItem('appSettings', JSON.stringify(settings)); }, [settings]);
+    useEffect(() => { localStorage.setItem('savedBills', JSON.stringify(savedBills)); }, [savedBills]);
 
-    useEffect(() => {
-        if(viewMode !== 'billing') return;
-        localStorage.setItem('billItems', JSON.stringify(billItems));
-    }, [billItems, viewMode]);
+    // Current bill persistence effects
+    useEffect(() => { if(viewMode !== 'billing') return; localStorage.setItem('patientDetails', JSON.stringify(patientDetails)); }, [patientDetails, viewMode]);
+    useEffect(() => { if(viewMode !== 'billing') return; localStorage.setItem('billItems', JSON.stringify(billItems)); }, [billItems, viewMode]);
+    useEffect(() => { if(viewMode !== 'billing') return; localStorage.setItem('totalDiscount', JSON.stringify(totalDiscount)); }, [totalDiscount, viewMode]);
+    useEffect(() => { if(viewMode !== 'billing') return; localStorage.setItem('paymentDetails', JSON.stringify(paymentDetails)); }, [paymentDetails, viewMode]);
+    useEffect(() => { if(viewMode !== 'billing') return; localStorage.setItem('commissionRate', JSON.stringify(commissionRate)); }, [commissionRate, viewMode]);
+    useEffect(() => { if(viewMode !== 'billing') return; localStorage.setItem('currentBillNumber', JSON.stringify(billNumber)); }, [billNumber, viewMode]);
 
-     useEffect(() => {
-        if(viewMode !== 'billing') return;
-        localStorage.setItem('totalDiscount', JSON.stringify(totalDiscount));
-    }, [totalDiscount, viewMode]);
+    // Auto-delete old bills effect
+    useEffect(() => {
+        if (settings.autoDeleteDays > 0) {
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - settings.autoDeleteDays);
+            
+            const billsToKeep = savedBills.filter(bill => new Date(bill.date) >= cutoffDate);
 
-    useEffect(() => {
-        if(viewMode !== 'billing') return;
-        localStorage.setItem('paymentDetails', JSON.stringify(paymentDetails));
-    }, [paymentDetails, viewMode]);
+            if (billsToKeep.length < savedBills.length) {
+                console.log(`Auto-deleted ${savedBills.length - billsToKeep.length} bills older than ${settings.autoDeleteDays} days.`);
+                setSavedBills(billsToKeep);
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [settings.autoDeleteDays]); // Only run on initial load
 
-    useEffect(() => {
-        if(viewMode !== 'billing') return;
-        localStorage.setItem('commissionRate', JSON.stringify(commissionRate));
-    }, [commissionRate, viewMode]);
-
-    useEffect(() => {
-        if(viewMode !== 'billing') return;
-        localStorage.setItem('currentBillNumber', JSON.stringify(billNumber));
-    }, [billNumber, viewMode]);
-    
-    useEffect(() => {
-        localStorage.setItem('savedBills', JSON.stringify(savedBills));
-    }, [savedBills]);
 
     // --- HANDLERS ---
     const handleLogin = (username: string, password: string): boolean => {
-        const userInDb = USERS[username as keyof typeof USERS];
+        const userInDb = users[username];
         if (userInDb && userInDb.password === password) {
-            const user: User = { username, role: userInDb.role as 'admin' | 'user' };
+            const user: User = { username, role: userInDb.role };
             setCurrentUser(user);
-            // Set initial view based on role
-            setViewMode(user.role === 'admin' ? 'dashboard' : 'billing');
+            const initialView = user.role === 'admin' ? 'dashboard' : 'billing';
+            setViewMode(initialView);
+            setAdminView('main');
             return true;
         }
         return false;
@@ -122,10 +147,11 @@ const App: React.FC = () => {
 
     const handleLogout = () => {
         setCurrentUser(null);
+        setAdminView('main');
     };
 
     const handleAddTest = useCallback((test: Test) => {
-        setIsViewingArchived(false); // Any edit creates a new, unsaved bill
+        setIsViewingArchived(false);
         setBillItems(prevItems => {
             if (prevItems.some(item => item.id === test.id)) {
                 return prevItems;
@@ -169,7 +195,7 @@ const App: React.FC = () => {
         const cappedTotalDiscount = Math.max(0, Math.min(totalDiscount, subtotal - itemDiscounts));
         const totalDiscountAmount = itemDiscounts + cappedTotalDiscount;
         const taxableAmount = subtotal - totalDiscountAmount;
-        const tax = taxableAmount * TAX_RATE;
+        const tax = taxableAmount * settings.taxRate;
         const total = taxableAmount + tax;
         const balanceDue = total - paymentDetails.amountPaid;
 
@@ -190,7 +216,7 @@ const App: React.FC = () => {
         setSavedBills(prev => [...prev, newSavedBill]);
         localStorage.setItem('lastBillNumber', billNumber.toString());
         handleClearBill();
-    }, [billItems, patientDetails, totalDiscount, paymentDetails, commissionRate, billNumber, handleClearBill]);
+    }, [billItems, patientDetails, totalDiscount, paymentDetails, commissionRate, billNumber, handleClearBill, settings.taxRate]);
 
     const handleViewArchivedBill = useCallback((bill: SavedBill) => {
         setBillNumber(bill.billNumber);
@@ -201,7 +227,15 @@ const App: React.FC = () => {
         setCommissionRate(bill.commissionRate);
         setIsViewingArchived(true);
         setViewMode('billing');
+        setAdminView('main');
     }, []);
+
+    const handleSetViewMode = (mode: 'billing' | 'history' | 'dashboard') => {
+        setViewMode(mode);
+        if (mode !== 'dashboard') {
+            setAdminView('main');
+        }
+    };
 
 
     if (!currentUser) {
@@ -214,7 +248,7 @@ const App: React.FC = () => {
                 return (
                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 print:grid-cols-1">
                         <div className="print:hidden">
-                            <TestSelector testData={TEST_DATA} onAddTest={handleAddTest} />
+                            <TestSelector testData={testData} onAddTest={handleAddTest} />
                         </div>
                         <div>
                             <Bill
@@ -227,7 +261,6 @@ const App: React.FC = () => {
                                 onRemoveItem={handleRemoveTest}
                                 onClearBill={handleClearBill}
                                 onSaveBill={handleSaveBill}
-                                taxRate={TAX_RATE}
                                 billNumber={billNumber}
                                 totalDiscount={totalDiscount}
                                 onTotalDiscountChange={(discount) => {
@@ -247,20 +280,30 @@ const App: React.FC = () => {
                                 }}
                                 userRole={currentUser.role}
                                 isViewingArchived={isViewingArchived}
+                                settings={settings}
                             />
                         </div>
                     </div>
                 );
             case 'history':
-                return (
-                    <History 
-                        savedBills={savedBills} 
-                        onViewBill={handleViewArchivedBill} 
-                    />
-                );
+                return <History savedBills={savedBills} onViewBill={handleViewArchivedBill} />;
             case 'dashboard':
                 if (currentUser.role === 'admin') {
-                    return <AdminDashboard />;
+                    switch(adminView) {
+                        case 'reports':
+                            return <BillingReports savedBills={savedBills} onBack={() => setAdminView('main')} />;
+                        case 'users':
+                           return <ManageUsers users={users} setUsers={setUsers} onBack={() => setAdminView('main')} />;
+                        case 'tests':
+                            return <ManageTests testData={testData} setTestData={setTestData} onBack={() => setAdminView('main')} />;
+                        case 'backup':
+                            return <BackupRestore onBack={() => setAdminView('main')} />;
+                        case 'settings':
+                            return <Settings settings={settings} setSettings={setSettings} onBack={() => setAdminView('main')} />;
+                        case 'main':
+                        default:
+                            return <AdminDashboard onSelectView={setAdminView} />;
+                    }
                 }
                 // Fallback for non-admins trying to access dashboard
                 setViewMode('billing');
@@ -276,7 +319,8 @@ const App: React.FC = () => {
                 currentUser={currentUser} 
                 onLogout={handleLogout}
                 viewMode={viewMode}
-                onSetViewMode={setViewMode}
+                onSetViewMode={handleSetViewMode}
+                settings={settings}
             />
             <main className="p-4 sm:p-6 md:p-8 print:p-0">
                  {renderContent()}

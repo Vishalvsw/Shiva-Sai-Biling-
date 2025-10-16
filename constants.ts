@@ -1,6 +1,8 @@
-import { TestCategory } from './types';
 
-export const TEST_DATA: TestCategory[] = [
+import { TestCategory, AppSettings } from './types';
+import { REFERRING_DOCTORS } from './referringDoctors';
+
+export const DEFAULT_TEST_DATA: TestCategory[] = [
   {
     category: 'HAEMATOLOGY',
     tests: [
@@ -101,4 +103,12 @@ export const TEST_DATA: TestCategory[] = [
   },
 ];
 
-export const TAX_RATE = 0.05; // 5% tax
+
+export const DEFAULT_SETTINGS: AppSettings = {
+    labName: 'SHIVASAI SCANNING, LAB & DIAGNOSTIC CENTER',
+    labAddress: 'Jadhav Complex, Near Jadhav Hospital, BHALKI-585 328',
+    labContact: 'Ph: 08484-467549 | shivasai.scan@gmail.com',
+    taxRate: 0.05,
+    referringDoctors: REFERRING_DOCTORS,
+    autoDeleteDays: 45, // 0 to disable
+};

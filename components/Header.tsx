@@ -1,11 +1,13 @@
+
 import React from 'react';
-import { User } from '../types';
+import { User, AppSettings } from '../types';
 
 interface HeaderProps {
     currentUser: User;
     onLogout: () => void;
     viewMode: 'billing' | 'history' | 'dashboard';
     onSetViewMode: (mode: 'billing' | 'history' | 'dashboard') => void;
+    settings: AppSettings;
 }
 
 const NavButton: React.FC<{
@@ -25,12 +27,12 @@ const NavButton: React.FC<{
 };
 
 
-const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, viewMode, onSetViewMode }) => {
+const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, viewMode, onSetViewMode, settings }) => {
     return (
         <header className="bg-white shadow-md p-4 print:hidden">
             <div className="container mx-auto flex justify-between items-center">
                 <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-slate-800">SHIVASAI SCANNING, LAB & DIAGNOSTIC CENTER</h1>
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-800">{settings.labName}</h1>
                     <p className="text-sm text-slate-500">Offline Billing System</p>
                 </div>
                 <div className="flex items-center gap-2">

@@ -1,4 +1,5 @@
 
+
 export interface Test {
   id: string;
   name: string;
@@ -43,4 +44,13 @@ export interface SavedBill {
     totalAmount: number;
     tax: number;
     balanceDue: number;
+}
+
+export interface AppSettings {
+    labName: string;
+    labAddress: string;
+    labContact: string;
+    taxRate: number; // e.g., 0.05 for 5%
+    referringDoctors: string[];
+    autoDeleteDays: number; // 0 to disable
 }

@@ -1,19 +1,19 @@
 
+
 import React from 'react';
-import { BillItem, PatientDetails, PaymentDetails } from '../types';
-import { REFERRING_DOCTORS } from '../referringDoctors';
+import { BillItem, PatientDetails, PaymentDetails, AppSettings } from '../types';
 import Barcode from './Barcode';
 
 interface BillProps {
     items: BillItem[];
     patientDetails: PatientDetails;
-    taxRate: number;
     billNumber: number;
     totalDiscount: number;
     paymentDetails: PaymentDetails;
     commissionRate: number;
     userRole: 'admin' | 'user';
     isViewingArchived: boolean;
+    settings: AppSettings;
     onPatientDetailsChange: (details: PatientDetails) => void;
     onRemoveItem: (testId: string) => void;
     onClearBill: () => void;
@@ -27,13 +27,13 @@ interface BillProps {
 const Bill: React.FC<BillProps> = ({ 
     items, 
     patientDetails, 
-    taxRate, 
     billNumber, 
     totalDiscount,
     paymentDetails,
     commissionRate,
     userRole,
     isViewingArchived,
+    settings,
     onPatientDetailsChange, 
     onRemoveItem, 
     onClearBill,
@@ -55,7 +55,7 @@ const Bill: React.FC<BillProps> = ({
     const cappedTotalDiscount = Math.max(0, Math.min(totalDiscount, subtotalAfterItemDiscounts));
     const totalDiscountAmount = itemDiscounts + cappedTotalDiscount;
     const taxableAmount = subtotal - totalDiscountAmount;
-    const tax = taxableAmount * taxRate;
+    const tax = taxableAmount * settings.taxRate;
     const total = taxableAmount + tax;
     const balanceDue = total - paymentDetails.amountPaid;
 
@@ -91,9 +91,9 @@ const Bill: React.FC<BillProps> = ({
             {/* Printable Header */}
             <div className="hidden print:block mb-8">
                 <div className="text-center">
-                    <h1 className="text-3xl font-bold text-slate-800">SHIVASAI SCANNING, LAB & DIAGNOSTIC CENTER</h1>
-                    <p className="text-sm text-slate-600">Jadhav Complex, Near Jadhav Hospital, BHALKI-585 328</p>
-                    <p className="text-sm text-slate-600">Ph: 08484-467549 | shivasai.scan@gmail.com</p>
+                    <h1 className="text-3xl font-bold text-slate-800">{settings.labName}</h1>
+                    <p className="text-sm text-slate-600">{settings.labAddress}</p>
+                    <p className="text-sm text-slate-600">{settings.labContact}</p>
                 </div>
                  <div className="mt-6 flex justify-between items-center border-y-2 border-slate-800 py-2">
                     <div className="w-1/3"></div> {/* Left spacer */}
@@ -147,7 +147,7 @@ const Bill: React.FC<BillProps> = ({
                             className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm print:border-none print:p-0 print:shadow-none print:appearance-none"
                         >
                             <option value="">Select a Doctor</option>
-                            {REFERRING_DOCTORS.map(doctor => (
+                            {settings.referringDoctors.map(doctor => (
                                 <option key={doctor} value={doctor}>{doctor}</option>
                             ))}
                         </select>
@@ -269,7 +269,7 @@ const Bill: React.FC<BillProps> = ({
                 </div>
 
                 <div className="flex justify-end gap-4">
-                    <span className="text-sm font-medium text-slate-500">Tax ({taxRate * 100}%):</span>
+                    <span className="text-sm font-medium text-slate-500">Tax ({settings.taxRate * 100}%):</span>
                     <span className="text-sm text-slate-900 w-28">₹{tax.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-end gap-4 border-t border-slate-200 pt-2 mt-2">
