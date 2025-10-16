@@ -15,9 +15,9 @@ const NavButton: React.FC<{
     onClick: () => void;
     children: React.ReactNode;
 }> = ({ isActive, onClick, children }) => {
-    const baseClasses = "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors";
-    const activeClasses = "bg-blue-600 text-white";
-    const inactiveClasses = "bg-slate-100 text-slate-700 hover:bg-slate-200";
+    const baseClasses = "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors duration-200";
+    const activeClasses = "bg-white text-teal-600 shadow-sm";
+    const inactiveClasses = "text-white hover:bg-white hover:bg-opacity-20";
     
     return (
         <button onClick={onClick} className={`${baseClasses} ${isActive ? activeClasses : inactiveClasses}`}>
@@ -29,14 +29,14 @@ const NavButton: React.FC<{
 
 const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, viewMode, onSetViewMode, settings }) => {
     return (
-        <header className="bg-white shadow-md p-4 print:hidden">
+        <header className="bg-gradient-to-r from-teal-500 to-cyan-600 shadow-lg p-4 print:hidden">
             <div className="container mx-auto flex justify-between items-center">
                 <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-slate-800">{settings.labName}</h1>
-                    <p className="text-sm text-slate-500">Offline Billing System</p>
+                    <h1 className="text-xl sm:text-2xl font-bold text-white">{settings.labName}</h1>
+                    <p className="text-sm text-cyan-100">Offline Billing System</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <nav className="flex items-center gap-2 border-r pr-2 mr-2">
+                    <nav className="flex items-center gap-2 border-r border-cyan-400 pr-2 mr-2">
                          {currentUser.role === 'admin' && (
                              <NavButton isActive={viewMode === 'dashboard'} onClick={() => onSetViewMode('dashboard')}>
                                 Dashboard
@@ -50,12 +50,12 @@ const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, viewMode, onSetV
                         </NavButton>
                     </nav>
                     <div className="text-right">
-                        <p className="font-semibold text-slate-700">Welcome, {currentUser.username}</p>
-                        <p className="text-xs text-slate-500 capitalize">{currentUser.role}</p>
+                        <p className="font-semibold text-white">Welcome, {currentUser.username}</p>
+                        <p className="text-xs text-cyan-200 capitalize">{currentUser.role}</p>
                     </div>
                     <button 
                         onClick={onLogout}
-                        className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+                        className="px-3 py-1.5 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600"
                     >
                         Logout
                     </button>

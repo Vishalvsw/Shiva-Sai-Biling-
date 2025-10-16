@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 
 type AppUser = { password: string; role: 'admin' | 'user' };
@@ -83,7 +84,7 @@ const ManageUsers: React.FC<ManageUsersProps> = ({ users, setUsers, onBack }) =>
                     </div>
                     <div className="flex justify-end gap-2">
                         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200">Cancel</button>
-                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Save</button>
+                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700">Save</button>
                     </div>
                 </form>
             </div>
@@ -107,7 +108,7 @@ const ManageUsers: React.FC<ManageUsersProps> = ({ users, setUsers, onBack }) =>
 
             <div className="bg-white p-6 rounded-xl shadow-lg space-y-4">
                 <div className="flex justify-end">
-                    <button onClick={() => setIsCreating(true)} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                    <button onClick={() => setIsCreating(true)} className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700">
                         Add New User
                     </button>
                 </div>
@@ -127,7 +128,7 @@ const ManageUsers: React.FC<ManageUsersProps> = ({ users, setUsers, onBack }) =>
                                     <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-slate-900 sm:pl-6">{username}</td>
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 capitalize">{data.role}</td>
                                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 space-x-2">
-                                        <button onClick={() => setEditingUser({ username, data })} className="text-blue-600 hover:text-blue-900">Edit</button>
+                                        <button onClick={() => setEditingUser({ username, data })} className="text-teal-600 hover:text-teal-900">Edit</button>
                                         <button onClick={() => handleDelete(username)} className="text-red-600 hover:text-red-900">Delete</button>
                                     </td>
                                 </tr>

@@ -31,7 +31,7 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill }) => {
                 placeholder="Search by patient name or bill number..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full max-w-lg p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full max-w-lg p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
             />
             <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200">
@@ -63,7 +63,7 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill }) => {
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">{bill.patientDetails.refdBy || 'N/A'}</td>
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right">₹{bill.totalAmount.toFixed(2)}</td>
                                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                                        <button onClick={() => onViewBill(bill)} className="text-blue-600 hover:text-blue-900">
+                                        <button onClick={() => onViewBill(bill)} className="text-teal-600 hover:text-teal-900">
                                             View
                                         </button>
                                     </td>

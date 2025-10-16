@@ -88,7 +88,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, onBack }) =>
                     <h3 className="text-xl font-bold text-slate-800">Referring Doctors</h3>
                     <form onSubmit={handleAddDoctor} className="flex gap-2">
                         <input type="text" value={newDoctor} onChange={e => setNewDoctor(e.target.value)} placeholder="Add new doctor name" className="flex-grow block w-full rounded-md border-slate-300 shadow-sm" />
-                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Add</button>
+                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700">Add</button>
                     </form>
                      <div className="space-y-1 pt-2">
                         {localSettings.referringDoctors.map(doc => (

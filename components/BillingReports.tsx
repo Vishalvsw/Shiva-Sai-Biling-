@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { SavedBill, BillItem } from '../types';
 
@@ -9,7 +10,7 @@ interface BillingReportsProps {
 const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode }> = ({ title, value, icon }) => (
     <div className="bg-white p-6 rounded-lg shadow-md border border-slate-200">
         <div className="flex items-center gap-4">
-            <div className="bg-blue-100 text-blue-600 p-3 rounded-full">
+            <div className="bg-teal-100 text-teal-600 p-3 rounded-full">
                 {icon}
             </div>
             <div>
@@ -108,7 +109,7 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, onBack }) =
                         id="dateRange"
                         value={dateRange}
                         onChange={e => setDateRange(e.target.value)}
-                        className="p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                      >
                         <option value="all">All Time</option>
                         <option value="today">Today</option>

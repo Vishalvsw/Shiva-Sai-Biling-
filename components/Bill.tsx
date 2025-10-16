@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { BillItem, PatientDetails, PaymentDetails, AppSettings } from '../types';
 import Barcode from './Barcode';
@@ -87,15 +86,15 @@ const Bill: React.FC<BillProps> = ({
     const isSaveDisabled = items.length === 0 || patientDetails.name.trim() === '' || isViewingArchived;
 
     return (
-        <div className="bg-white p-6 rounded-xl shadow-lg relative" id="bill-section">
+        <div className="bg-white p-6 rounded-xl shadow-lg relative print:p-0 print:shadow-none print:border-none" id="bill-section">
             {/* Printable Header */}
-            <div className="hidden print:block mb-8">
+            <div className="hidden print:block mb-4">
                 <div className="text-center">
                     <h1 className="text-3xl font-bold text-slate-800">{settings.labName}</h1>
                     <p className="text-sm text-slate-600">{settings.labAddress}</p>
                     <p className="text-sm text-slate-600">{settings.labContact}</p>
                 </div>
-                 <div className="mt-6 flex justify-between items-center border-y-2 border-slate-800 py-2">
+                 <div className="mt-4 flex justify-between items-center border-y-2 border-slate-800 py-2">
                     <div className="w-1/3"></div> {/* Left spacer */}
                     <h2 className="text-2xl font-bold text-slate-800 text-center w-1/3">INVOICE</h2>
                     <div className="w-1/3 flex justify-end">
@@ -106,12 +105,12 @@ const Bill: React.FC<BillProps> = ({
                 </div>
             </div>
 
-            {/* Patient Details Form */}
-            <div className="mb-6 border-b pb-6">
+            {/* Patient Details Section */}
+            <div className="mb-6 border-b pb-6 print:border-none print:pb-0">
                  <h2 className="text-2xl font-bold text-slate-800 sm:col-span-2 print:hidden mb-4">
                     {isViewingArchived ? `Viewing Bill #${String(billNumber).padStart(6, '0')}` : 'Patient Bill'}
                 </h2>
-                 <div className="sm:col-span-2 grid grid-cols-2 gap-4 mb-4">
+                 <div className="grid grid-cols-2 gap-4 mb-4 print:mb-2">
                     <div>
                         <p className="text-sm"><span className="font-semibold text-slate-700">Bill No:</span> {String(billNumber).padStart(6, '0')}</p>
                     </div>
@@ -119,18 +118,19 @@ const Bill: React.FC<BillProps> = ({
                         <p className="text-sm"><span className="font-semibold text-slate-700">Date:</span> {new Date().toLocaleDateString()}</p>
                     </div>
                 </div>
-                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                 {/* Screen View: Patient Details Form */}
+                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 print:hidden">
                     <div className="sm:col-span-4 md:col-span-2">
                         <label htmlFor="name" className="block text-sm font-medium text-slate-700">Patient Name</label>
-                        <input type="text" name="name" id="name" value={patientDetails.name} onChange={handleInputChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm print:border-none print:p-0 print:shadow-none" />
+                        <input type="text" name="name" id="name" value={patientDetails.name} onChange={handleInputChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm" />
                     </div>
                     <div>
                         <label htmlFor="age" className="block text-sm font-medium text-slate-700">Age</label>
-                        <input type="text" name="age" id="age" value={patientDetails.age} onChange={handleInputChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm print:border-none print:p-0 print:shadow-none" />
+                        <input type="text" name="age" id="age" value={patientDetails.age} onChange={handleInputChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm" />
                     </div>
                     <div>
                         <label htmlFor="sex" className="block text-sm font-medium text-slate-700">Sex</label>
-                        <select name="sex" id="sex" value={patientDetails.sex} onChange={handleInputChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm print:border-none print:p-0 print:shadow-none print:appearance-none">
+                        <select name="sex" id="sex" value={patientDetails.sex} onChange={handleInputChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm">
                             <option value="">Select</option>
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
@@ -144,7 +144,7 @@ const Bill: React.FC<BillProps> = ({
                             id="refdBy" 
                             value={patientDetails.refdBy} 
                             onChange={handleInputChange} 
-                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm print:border-none print:p-0 print:shadow-none print:appearance-none"
+                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm"
                         >
                             <option value="">Select a Doctor</option>
                             {settings.referringDoctors.map(doctor => (
@@ -153,7 +153,7 @@ const Bill: React.FC<BillProps> = ({
                         </select>
                     </div>
                     {userRole === 'admin' && (
-                        <div className="sm:col-span-4 md:col-span-2 print:hidden">
+                        <div className="sm:col-span-4 md:col-span-2">
                             <label htmlFor="commissionRate" className="block text-sm font-medium text-slate-700">Commission (%)</label>
                             <input 
                                 type="number" 
@@ -161,18 +161,30 @@ const Bill: React.FC<BillProps> = ({
                                 id="commissionRate" 
                                 value={commissionRate > 0 ? commissionRate : ''}
                                 onChange={(e) => onCommissionRateChange(parseFloat(e.target.value) || 0)}
-                                className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm"
                                 placeholder="0"
                             />
                         </div>
                     )}
                 </div>
+                 {/* Print View: Patient Details Text */}
+                <div className="hidden print:block border border-slate-600 p-2 text-sm">
+                    <div className="flex justify-between">
+                        <div className="pr-4">
+                            <p><strong className="font-semibold text-slate-800">Patient Name:</strong> {patientDetails.name}</p>
+                            <p><strong className="font-semibold text-slate-800">Referred by Dr.:</strong> {patientDetails.refdBy || 'N/A'}</p>
+                        </div>
+                        <div>
+                            <p><strong className="font-semibold text-slate-800">Age / Sex:</strong> {patientDetails.age} / {patientDetails.sex}</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Bill Items */}
-            <div className="flow-root">
-                <table className="min-w-full divide-y divide-slate-200">
-                    <thead className="bg-slate-50">
+            <div className="flow-root print:mt-4">
+                <table className="min-w-full divide-y divide-slate-300">
+                    <thead className="bg-slate-50 print:bg-white print:border-y-2 print:border-slate-800">
                         <tr>
                             <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-slate-900 sm:pl-6">Test Name</th>
                             <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">Price</th>
@@ -204,7 +216,7 @@ const Bill: React.FC<BillProps> = ({
                                                 onItemDiscountChange(item.id, Math.max(0, Math.min(item.price, discount)));
                                             }}
                                             placeholder="0.00"
-                                            className="w-24 rounded-md border-slate-300 py-1 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                            className="w-24 rounded-md border-slate-300 py-1 text-right shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm"
                                         />
                                         {item.discount > 0 && (
                                             <p className="text-xs text-slate-500 mt-1">
@@ -228,7 +240,7 @@ const Bill: React.FC<BillProps> = ({
             </div>
 
             {/* Totals Section */}
-            <div className="mt-6 border-t border-slate-200 pt-6 space-y-2 text-right">
+            <div className="mt-6 border-t border-slate-200 pt-6 space-y-2 text-right print:mt-8 print:pt-4 print:border-t-2 print:border-slate-800">
                 <div className="flex justify-end gap-4">
                     <span className="text-sm font-medium text-slate-500">Subtotal:</span>
                     <span className="text-sm text-slate-900 w-28">₹{subtotal.toFixed(2)}</span>
@@ -245,7 +257,7 @@ const Bill: React.FC<BillProps> = ({
                                 value={totalDiscount > 0 ? totalDiscount : ''}
                                 onChange={(e) => onTotalDiscountChange(parseFloat(e.target.value) || 0)}
                                 placeholder="0.00"
-                                className="w-28 rounded-md border-slate-300 py-1 pl-7 pr-2 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                className="w-28 rounded-md border-slate-300 py-1 pl-7 pr-2 text-right shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm"
                             />
                         </div>
                         {totalDiscount > 0 && (
@@ -281,7 +293,7 @@ const Bill: React.FC<BillProps> = ({
                 {userRole === 'admin' && commissionAmount > 0 && (
                      <div className="flex justify-end gap-4 pt-2 border-t border-dashed print:hidden">
                         <span className="text-sm font-medium text-slate-500">Reference Commission:</span>
-                        <span className="text-sm font-semibold text-blue-600 w-28">
+                        <span className="text-sm font-semibold text-teal-600 w-28">
                             ₹{commissionAmount.toFixed(2)}
                         </span>
                     </div>
@@ -289,34 +301,51 @@ const Bill: React.FC<BillProps> = ({
 
                 {/* --- Payment Details --- */}
                 <div className="pt-4 mt-4 border-t border-dashed space-y-2">
-                     <div className="flex justify-end items-center gap-4">
-                        <label htmlFor="paymentMethod" className="text-sm font-medium text-slate-500">Payment Method:</label>
-                         <select name="paymentMethod" id="paymentMethod" value={paymentDetails.paymentMethod} onChange={handlePaymentChange} className="w-28 rounded-md border-slate-300 py-1 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm print:border-none print:shadow-none print:appearance-none">
-                             <option value="">Select</option>
-                             <option value="Cash">Cash</option>
-                             <option value="Card">Card</option>
-                             <option value="UPI">UPI</option>
-                             <option value="Other">Other</option>
-                         </select>
-                    </div>
-                    <div className="flex justify-end items-center gap-4">
-                        <label htmlFor="amountPaid" className="text-sm font-medium text-slate-500">Amount Paid:</label>
-                         <div className="relative">
-                            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 print:hidden">₹</span>
-                            <input
-                                type="number"
-                                id="amountPaid"
-                                name="amountPaid"
-                                value={paymentDetails.amountPaid > 0 ? paymentDetails.amountPaid : ''}
-                                onChange={handlePaymentChange}
-                                placeholder="0.00"
-                                className="w-28 rounded-md border-slate-300 py-1 pl-7 pr-2 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm print:border-none print:shadow-none print:pl-1"
-                            />
+                    {/* Screen Inputs */}
+                    <div className="space-y-2 print:hidden">
+                        <div className="flex justify-end items-center gap-4">
+                            <label htmlFor="paymentMethod" className="text-sm font-medium text-slate-500">Payment Method:</label>
+                            <select name="paymentMethod" id="paymentMethod" value={paymentDetails.paymentMethod} onChange={handlePaymentChange} className="w-28 rounded-md border-slate-300 py-1 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm">
+                                <option value="">Select</option>
+                                <option value="Cash">Cash</option>
+                                <option value="Card">Card</option>
+                                <option value="UPI">UPI</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div className="flex justify-end items-center gap-4">
+                            <label htmlFor="amountPaid" className="text-sm font-medium text-slate-500">Amount Paid:</label>
+                            <div className="relative">
+                                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">₹</span>
+                                <input
+                                    type="number"
+                                    id="amountPaid"
+                                    name="amountPaid"
+                                    value={paymentDetails.amountPaid > 0 ? paymentDetails.amountPaid : ''}
+                                    onChange={handlePaymentChange}
+                                    placeholder="0.00"
+                                    className="w-28 rounded-md border-slate-300 py-1 pl-7 pr-2 text-right shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm"
+                                />
+                            </div>
                         </div>
                     </div>
+                    
+                    {/* Print Display */}
+                    <div className="hidden print:block space-y-2">
+                        <div className="flex justify-end gap-4">
+                            <span className="text-sm font-medium text-slate-500">Payment Method:</span>
+                            <span className="text-sm text-slate-900 w-28">{paymentDetails.paymentMethod || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-end gap-4">
+                            <span className="text-sm font-medium text-slate-500">Amount Paid:</span>
+                            <span className="text-sm text-slate-900 w-28">₹{paymentDetails.amountPaid.toFixed(2)}</span>
+                        </div>
+                    </div>
+
+                    {/* Shared Balance Due */}
                      <div className="flex justify-end gap-4 border-t border-slate-200 pt-2 mt-2">
                         <span className="text-base font-bold text-slate-900">Balance Due:</span>
-                        <span className={`text-base font-bold text-slate-900 w-28 ${balanceDue > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        <span className={`text-base font-bold w-28 ${balanceDue > 0 ? 'text-red-600' : 'text-green-600'}`}>
                             ₹{balanceDue.toFixed(2)}
                         </span>
                     </div>
@@ -335,11 +364,12 @@ const Bill: React.FC<BillProps> = ({
                 >
                     Save Bill
                 </button>
-                <button onClick={handlePrint} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 disabled:bg-slate-300" disabled={items.length === 0}>Print Bill</button>
+                <button onClick={handlePrint} className="px-4 py-2 text-sm font-medium text-white bg-teal-600 border border-transparent rounded-lg hover:bg-teal-700 disabled:bg-slate-300" disabled={items.length === 0}>Print Bill</button>
             </div>
             
-            <div className="hidden print:block mt-24 text-center">
-                 <p className="text-sm">--- Thank you ---</p>
+             <div className="hidden print:block mt-24 text-center">
+                <p className="border-t border-dashed border-slate-500 pt-4 text-xs text-slate-600">Generated by MediBill</p>
+                <p className="text-sm">--- Thank you ---</p>
             </div>
         </div>
     );

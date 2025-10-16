@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 type AdminView = 'reports' | 'users' | 'tests' | 'backup' | 'settings';
@@ -15,7 +16,7 @@ const AdminCard: React.FC<AdminCardProps> = ({ title, description, icon, onClick
         className="bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition-shadow text-left border border-slate-200 w-full"
     >
         <div className="flex items-center gap-4">
-            <div className="bg-blue-100 text-blue-600 p-3 rounded-full">
+            <div className="bg-teal-100 text-teal-600 p-3 rounded-full">
                 {icon}
             </div>
             <div>

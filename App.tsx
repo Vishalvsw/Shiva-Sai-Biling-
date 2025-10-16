@@ -14,6 +14,7 @@ import ManageUsers from './components/ManageUsers';
 import ManageTests from './components/ManageTests';
 import BackupRestore from './components/BackupRestore';
 import Settings from './components/Settings';
+import SplashScreen from './components/SplashScreen';
 
 
 type AdminView = 'main' | 'reports' | 'users' | 'tests' | 'backup' | 'settings';
@@ -21,6 +22,7 @@ type AppUser = { password: string; role: 'admin' | 'user' };
 
 const App: React.FC = () => {
     // --- APP STATE ---
+    const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'billing' | 'history' | 'dashboard'>('billing');
     const [adminView, setAdminView] = useState<AdminView>('main');
     const [isViewingArchived, setIsViewingArchived] = useState<boolean>(false);
@@ -93,6 +95,11 @@ const App: React.FC = () => {
     
     // --- EFFECTS ---
      useEffect(() => {
+        const timer = setTimeout(() => setIsLoading(false), 2500);
+        return () => clearTimeout(timer);
+    }, []);
+    
+    useEffect(() => {
         if (currentUser) {
             localStorage.setItem('currentUser', JSON.stringify(currentUser));
         } else {
@@ -237,6 +244,9 @@ const App: React.FC = () => {
         }
     };
 
+    if (isLoading) {
+        return <SplashScreen labName={settings.labName} />;
+    }
 
     if (!currentUser) {
         return <LoginPage onLogin={handleLogin} />;
@@ -314,7 +324,7 @@ const App: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-100 font-sans print:bg-white">
+        <div className="min-h-screen bg-gray-50 font-sans print:bg-white">
             <Header 
                 currentUser={currentUser} 
                 onLogout={handleLogout}

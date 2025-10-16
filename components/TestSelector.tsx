@@ -47,7 +47,7 @@ const AccordionItem: React.FC<{
                         <button
                             key={test.id}
                             onClick={() => onAddTest(test)}
-                            className="text-sm text-left p-2 rounded-md bg-white border border-slate-300 hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+                            className="text-sm text-left p-2 rounded-md bg-white border border-slate-300 hover:bg-teal-500 hover:text-white hover:border-teal-500 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-opacity-50"
                         >
                             {test.name}
                         </button>
@@ -69,7 +69,7 @@ const TestSelector: React.FC<TestSelectorProps> = ({ testData, onAddTest }) => {
                 placeholder="Search for a test..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
             />
             <div className="space-y-2 max-h-[calc(100vh-250px)] overflow-y-auto pr-2">
                 {testData.map((category, index) => (
