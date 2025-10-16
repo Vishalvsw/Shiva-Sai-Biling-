@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Test, PatientDetails, BillItem, PaymentDetails, User, SavedBill, AppSettings, TestCategory } from './types';
 import { DEFAULT_TEST_DATA, DEFAULT_SETTINGS } from './constants';
@@ -15,6 +14,7 @@ import ManageTests from './components/ManageTests';
 import BackupRestore from './components/BackupRestore';
 import Settings from './components/Settings';
 import SplashScreen from './components/SplashScreen';
+import Footer from './components/Footer';
 
 
 type AdminView = 'main' | 'reports' | 'users' | 'tests' | 'backup' | 'settings';
@@ -324,7 +324,7 @@ const App: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 font-sans print:bg-white">
+        <div className="flex flex-col min-h-screen bg-gray-50 font-sans print:bg-white">
             <Header 
                 currentUser={currentUser} 
                 onLogout={handleLogout}
@@ -332,9 +332,10 @@ const App: React.FC = () => {
                 onSetViewMode={handleSetViewMode}
                 settings={settings}
             />
-            <main className="p-4 sm:p-6 md:p-8 print:p-0">
+            <main className="flex-grow p-4 sm:p-6 md:p-8 print:p-0">
                  {renderContent()}
             </main>
+            <Footer labName={settings.labName} />
         </div>
     );
 };

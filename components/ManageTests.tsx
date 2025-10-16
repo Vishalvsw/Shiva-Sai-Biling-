@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { TestCategory, Test } from '../types';
 
@@ -75,7 +74,7 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
             
             <div className="bg-white p-6 rounded-xl shadow-lg space-y-4">
                  <div className="flex justify-end">
-                    <button onClick={handleAddCategory} className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700">
+                    <button onClick={handleAddCategory} className="px-4 py-2 text-sm font-medium text-white bg-[#143A78] rounded-lg hover:bg-blue-900">
                         Add New Category
                     </button>
                 </div>
@@ -88,7 +87,7 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
                                     type="text"
                                     value={category.category}
                                     onChange={(e) => handleCategoryChange(catIndex, e.target.value)}
-                                    className="text-xl font-bold text-slate-800 border-b-2 border-transparent focus:border-teal-500 outline-none"
+                                    className="text-xl font-bold text-slate-800 border-b-2 border-transparent focus:border-blue-500 outline-none"
                                 />
                                 <button onClick={() => handleDeleteCategory(catIndex)} className="text-red-500 hover:text-red-700 text-sm">Delete Category</button>
                             </div>
@@ -112,7 +111,7 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
                                         </button>
                                     </div>
                                 ))}
-                                <button onClick={() => handleAddTest(catIndex)} className="mt-2 text-sm text-teal-600 hover:text-teal-800">+ Add Test</button>
+                                <button onClick={() => handleAddTest(catIndex)} className="mt-2 text-sm text-orange-600 hover:text-orange-800">+ Add Test</button>
                             </div>
                         </div>
                     ))}

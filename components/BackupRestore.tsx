@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface BackupRestoreProps {
@@ -88,7 +87,7 @@ const BackupRestore: React.FC<BackupRestoreProps> = ({ onBack }) => {
                 <div className="bg-white p-6 rounded-xl shadow-lg space-y-4">
                     <h3 className="text-xl font-bold text-slate-800 border-b pb-2">Backup Data</h3>
                     <p className="text-sm text-slate-600">Download a JSON file containing all your application data, including saved bills, users, tests, and settings. Keep this file in a safe place.</p>
-                    <button onClick={handleBackup} className="w-full px-4 py-2 font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700">
+                    <button onClick={handleBackup} className="w-full px-4 py-2 font-medium text-white bg-[#143A78] rounded-lg hover:bg-blue-900">
                         Download Backup File
                     </button>
                 </div>
