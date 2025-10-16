@@ -30,3 +30,17 @@ export interface User {
     username: string;
     role: 'admin' | 'user';
 }
+
+export interface SavedBill {
+    billNumber: number;
+    date: string;
+    patientDetails: PatientDetails;
+    billItems: BillItem[];
+    totalDiscount: number;
+    paymentDetails: PaymentDetails;
+    commissionRate: number;
+    subtotal: number;
+    totalAmount: number;
+    tax: number;
+    balanceDue: number;
+}

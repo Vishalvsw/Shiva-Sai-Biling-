@@ -13,9 +13,11 @@ interface BillProps {
     paymentDetails: PaymentDetails;
     commissionRate: number;
     userRole: 'admin' | 'user';
+    isViewingArchived: boolean;
     onPatientDetailsChange: (details: PatientDetails) => void;
     onRemoveItem: (testId: string) => void;
     onClearBill: () => void;
+    onSaveBill: () => void;
     onItemDiscountChange: (testId: string, discount: number) => void;
     onTotalDiscountChange: (discount: number) => void;
     onPaymentDetailsChange: (details: PaymentDetails) => void;
@@ -31,9 +33,11 @@ const Bill: React.FC<BillProps> = ({
     paymentDetails,
     commissionRate,
     userRole,
+    isViewingArchived,
     onPatientDetailsChange, 
     onRemoveItem, 
     onClearBill,
+    onSaveBill,
     onItemDiscountChange,
     onTotalDiscountChange,
     onPaymentDetailsChange,
@@ -80,6 +84,8 @@ const Bill: React.FC<BillProps> = ({
         }
     };
 
+    const isSaveDisabled = items.length === 0 || patientDetails.name.trim() === '' || isViewingArchived;
+
     return (
         <div className="bg-white p-6 rounded-xl shadow-lg relative" id="bill-section">
             {/* Printable Header */}
@@ -102,7 +108,9 @@ const Bill: React.FC<BillProps> = ({
 
             {/* Patient Details Form */}
             <div className="mb-6 border-b pb-6">
-                 <h2 className="text-2xl font-bold text-slate-800 sm:col-span-2 print:hidden mb-4">Patient Bill</h2>
+                 <h2 className="text-2xl font-bold text-slate-800 sm:col-span-2 print:hidden mb-4">
+                    {isViewingArchived ? `Viewing Bill #${String(billNumber).padStart(6, '0')}` : 'Patient Bill'}
+                </h2>
                  <div className="sm:col-span-2 grid grid-cols-2 gap-4 mb-4">
                     <div>
                         <p className="text-sm"><span className="font-semibold text-slate-700">Bill No:</span> {String(billNumber).padStart(6, '0')}</p>
@@ -319,6 +327,14 @@ const Bill: React.FC<BillProps> = ({
             {/* Action Buttons */}
             <div className="mt-8 flex justify-end gap-3 print:hidden">
                 <button onClick={handleNewBillClick} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200">New Bill</button>
+                <button 
+                    onClick={onSaveBill}
+                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-lg hover:bg-green-700 disabled:bg-slate-300" 
+                    disabled={isSaveDisabled}
+                    title={isSaveDisabled ? "Add items and patient name to save" : "Save bill to history"}
+                >
+                    Save Bill
+                </button>
                 <button onClick={handlePrint} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 disabled:bg-slate-300" disabled={items.length === 0}>Print Bill</button>
             </div>
             
