@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { AppSettings } from '../types';
 
@@ -75,10 +76,15 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, onBack }) =>
 
                 {/* Financials */}
                 <div className="space-y-2 border-b pb-4">
-                     <h3 className="text-xl font-bold text-slate-800">Financial</h3>
+                     <h3 className="text-xl font-bold text-slate-800">Financial & Security</h3>
                      <div>
                         <label className="block text-sm font-medium text-slate-700">Tax Rate (%)</label>
                         <input type="number" name="taxRate" value={localSettings.taxRate * 100} onChange={handleTaxChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" />
+                     </div>
+                     <div className="pt-2">
+                        <label className="block text-sm font-medium text-slate-700">Admin Verification Threshold (₹)</label>
+                        <input type="number" name="verificationThreshold" value={localSettings.verificationThreshold} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" />
+                        <p className="text-xs text-slate-500 mt-1">Bills with a total amount above this value will require admin approval.</p>
                      </div>
                 </div>
                 

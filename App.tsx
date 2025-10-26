@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Test, PatientDetails, BillItem, PaymentDetails, User, SavedBill, AppSettings, TestCategory, AuditLogEntry } from './types';
 import { DEFAULT_TEST_DATA, DEFAULT_SETTINGS } from './constants';
@@ -29,6 +30,7 @@ const App: React.FC = () => {
     const [viewMode, setViewMode] = useState<'billing' | 'history' | 'dashboard'>('billing');
     const [adminView, setAdminView] = useState<AdminView>('main');
     const [isViewingArchived, setIsViewingArchived] = useState<boolean>(false);
+    const [viewedBillDetails, setViewedBillDetails] = useState<SavedBill | null>(null);
     
     // --- AUTHENTICATION STATE ---
     const [currentUser, setCurrentUser] = useState<User | null>(() => {
@@ -190,6 +192,7 @@ const App: React.FC = () => {
 
     const handleAddTest = useCallback((test: Test) => {
         setIsViewingArchived(false);
+        setViewedBillDetails(null);
         setBillItems(prevItems => {
             if (prevItems.some(item => item.id === test.id)) {
                 return prevItems;
@@ -200,11 +203,13 @@ const App: React.FC = () => {
 
     const handleRemoveTest = useCallback((testId: string) => {
         setIsViewingArchived(false);
+        setViewedBillDetails(null);
         setBillItems(prevItems => prevItems.filter(item => item.id !== testId));
     }, []);
     
     const handleItemDiscountChange = useCallback((testId: string, discountValue: number) => {
         setIsViewingArchived(false);
+        setViewedBillDetails(null);
         setBillItems(prevItems =>
             prevItems.map(item =>
                 item.id === testId ? { ...item, discount: discountValue } : item
@@ -229,9 +234,24 @@ const App: React.FC = () => {
         setCommissionRate(0);
         setBillNumber(newBillNumber);
         setIsViewingArchived(false);
+        setViewedBillDetails(null);
     }, [savedBills, billItems.length, billNumber, logAction]);
 
     const handleSaveBill = useCallback(() => {
+        if (!currentUser || billItems.length === 0) return;
+
+        // Determine Bill Type
+        let billType: 'Standard' | 'Department' = 'Standard';
+        let department: string | undefined = undefined;
+
+        const firstItem = billItems[0];
+        const categoryOfFirstItem = testData.find(cat => cat.tests.some(t => t.id === firstItem.id));
+        if (categoryOfFirstItem?.isMajor) {
+            billType = 'Department';
+            department = categoryOfFirstItem.category;
+        }
+
+        // Calculations
         const subtotal = billItems.reduce((acc, item) => acc + item.price, 0);
         const itemDiscounts = billItems.reduce((acc, item) => acc + item.discount, 0);
         const cappedTotalDiscount = Math.max(0, Math.min(totalDiscount, subtotal - itemDiscounts));
@@ -244,11 +264,13 @@ const App: React.FC = () => {
         let paymentStatus: 'Paid' | 'Partial' | 'Unpaid';
         if (paymentDetails.amountPaid <= 0 && total > 0) {
             paymentStatus = 'Unpaid';
-        } else if (balanceDue > 0) {
+        } else if (balanceDue > 0.01) {
             paymentStatus = 'Partial';
         } else {
-            paymentStatus = 'Paid'; // Covers full payment and overpayment
+            paymentStatus = 'Paid';
         }
+
+        const verificationStatus = total >= settings.verificationThreshold ? 'Pending' : 'Verified';
 
         const newSavedBill: SavedBill = {
             billNumber,
@@ -263,14 +285,18 @@ const App: React.FC = () => {
             totalAmount: total,
             balanceDue,
             paymentStatus,
+            billedBy: currentUser.username,
+            verificationStatus,
             status: 'active',
+            billType,
+            department,
         };
         
-        logAction('BILL_SAVED', `Bill #${billNumber} saved for "${patientDetails.name}". Total: ₹${total.toFixed(2)}, Paid: ₹${paymentDetails.amountPaid.toFixed(2)}, Status: ${paymentStatus}.`);
+        logAction('BILL_SAVED', `Bill #${billNumber} saved for "${patientDetails.name}". Type: ${department || 'Standard'}. Total: ₹${total.toFixed(2)}, Paid: ₹${paymentDetails.amountPaid.toFixed(2)}.`);
         setSavedBills(prev => [...prev, newSavedBill]);
         localStorage.setItem('lastBillNumber', billNumber.toString());
         handleClearBill();
-    }, [billItems, patientDetails, totalDiscount, paymentDetails, commissionRate, billNumber, handleClearBill, settings.taxRate, logAction]);
+    }, [billItems, patientDetails, totalDiscount, paymentDetails, commissionRate, billNumber, handleClearBill, settings, logAction, currentUser, testData]);
 
     const handleVoidBill = useCallback((billNumberToVoid: number, reason: string) => {
         if (!currentUser) return;
@@ -293,6 +319,25 @@ const App: React.FC = () => {
         logAction('BILL_VOIDED', `Bill #${billNumberToVoid} was voided. Reason: ${reason}`);
     }, [currentUser, logAction]);
 
+    const handleVerifyBill = useCallback((billNumberToVerify: number, isApproved: boolean, reason?: string) => {
+        if (!currentUser || currentUser.role !== 'admin') return;
+
+        setSavedBills(prevBills =>
+            prevBills.map(bill => {
+                if (bill.billNumber === billNumberToVerify) {
+                    if (isApproved) {
+                        logAction('BILL_VERIFIED', `Bill #${billNumberToVerify} was approved.`);
+                        return { ...bill, verificationStatus: 'Verified' };
+                    } else {
+                        logAction('BILL_REJECTED', `Bill #${billNumberToVerify} was rejected. Reason: ${reason}`);
+                        return { ...bill, verificationStatus: 'Rejected', rejectionReason: reason };
+                    }
+                }
+                return bill;
+            })
+        );
+    }, [currentUser, logAction]);
+
     const handleViewArchivedBill = useCallback((bill: SavedBill) => {
         setBillNumber(bill.billNumber);
         setPatientDetails(bill.patientDetails);
@@ -301,6 +346,7 @@ const App: React.FC = () => {
         setPaymentDetails(bill.paymentDetails);
         setCommissionRate(bill.commissionRate);
         setIsViewingArchived(true);
+        setViewedBillDetails(bill);
         setViewMode('billing');
         setAdminView('main');
     }, []);
@@ -326,14 +372,21 @@ const App: React.FC = () => {
                 return (
                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 print:grid-cols-1">
                         <div className="print:hidden">
-                            <TestSelector testData={testData} onAddTest={handleAddTest} />
+                            <TestSelector 
+                                testData={testData} 
+                                onAddTest={handleAddTest}
+                                onRemoveTest={handleRemoveTest}
+                                currentBillItems={billItems} 
+                            />
                         </div>
                         <div>
                             <Bill
                                 items={billItems}
+                                testData={testData}
                                 patientDetails={patientDetails}
                                 onPatientDetailsChange={(details) => {
                                     setIsViewingArchived(false);
+                                    setViewedBillDetails(null);
                                     setPatientDetails(details);
                                 }}
                                 onRemoveItem={handleRemoveTest}
@@ -343,33 +396,37 @@ const App: React.FC = () => {
                                 totalDiscount={totalDiscount}
                                 onTotalDiscountChange={(discount) => {
                                     setIsViewingArchived(false);
+                                    setViewedBillDetails(null);
                                     setTotalDiscount(discount);
                                 }}
                                 onItemDiscountChange={handleItemDiscountChange}
                                 paymentDetails={paymentDetails}
                                 onPaymentDetailsChange={(details) => {
                                     setIsViewingArchived(false);
+                                    setViewedBillDetails(null);
                                     setPaymentDetails(details);
                                 }}
                                 commissionRate={commissionRate}
                                 onCommissionRateChange={(rate) => {
                                     setIsViewingArchived(false);
+                                    setViewedBillDetails(null);
                                     setCommissionRate(rate);
                                 }}
                                 userRole={currentUser.role}
                                 isViewingArchived={isViewingArchived}
+                                viewedBillDetails={viewedBillDetails}
                                 settings={settings}
                             />
                         </div>
                     </div>
                 );
             case 'history':
-                return <History savedBills={savedBills} onViewBill={handleViewArchivedBill} onVoidBill={handleVoidBill} currentUser={currentUser} />;
+                return <History savedBills={savedBills} onViewBill={handleViewArchivedBill} onVoidBill={handleVoidBill} onVerifyBill={handleVerifyBill} currentUser={currentUser} />;
             case 'dashboard':
                 if (currentUser.role === 'admin') {
                     switch(adminView) {
                         case 'reports':
-                            return <BillingReports savedBills={savedBills} onBack={() => setAdminView('main')} />;
+                            return <BillingReports savedBills={savedBills} testData={testData} onBack={() => setAdminView('main')} />;
                         case 'users':
                            return <ManageUsers users={users} setUsers={setUsers} onBack={() => setAdminView('main')} />;
                         case 'tests':

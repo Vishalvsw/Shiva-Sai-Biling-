@@ -1,9 +1,11 @@
 
+
 import React, { useState, useMemo } from 'react';
-import { SavedBill, BillItem } from '../types';
+import { SavedBill, BillItem, TestCategory } from '../types';
 
 interface BillingReportsProps {
     savedBills: SavedBill[];
+    testData: TestCategory[];
     onBack: () => void;
 }
 
@@ -22,35 +24,47 @@ const StatCard: React.FC<{ title: string; value: string | number; subValue?: str
     </div>
 );
 
-const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, onBack }) => {
+const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, onBack }) => {
     const [dateRange, setDateRange] = useState('all');
+    const [departmentFilter, setDepartmentFilter] = useState('all');
+
+    const departmentOptions = useMemo(() => {
+        return testData.filter(cat => cat.isMajor).map(cat => cat.category);
+    }, [testData]);
 
     const filteredBills = useMemo(() => {
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        if (dateRange === 'all') {
-            return savedBills;
+        let bills = savedBills;
+
+        // Date Range Filter
+        if (dateRange !== 'all') {
+            let startDate: Date;
+            if (dateRange === 'today') {
+                startDate = today;
+            } else if (dateRange === '7days') {
+                startDate = new Date(today);
+                startDate.setDate(today.getDate() - 6);
+            } else { // 30days
+                startDate = new Date(today);
+                startDate.setDate(today.getDate() - 29);
+            }
+            startDate.setHours(0, 0, 0, 0);
+            bills = bills.filter(bill => new Date(bill.date) >= startDate);
         }
 
-        let startDate: Date;
-        if (dateRange === 'today') {
-            startDate = today;
-        } else if (dateRange === '7days') {
-            startDate = new Date(today);
-            startDate.setDate(today.getDate() - 6);
-        } else if (dateRange === '30days') {
-            startDate = new Date(today);
-            startDate.setDate(today.getDate() - 29);
-        } else {
-            return savedBills;
+        // Department Filter
+        if (departmentFilter !== 'all') {
+            if (departmentFilter === 'Standard') {
+                bills = bills.filter(bill => bill.billType === 'Standard');
+            } else {
+                bills = bills.filter(bill => bill.department === departmentFilter);
+            }
         }
         
-        // Include bills from the start of the startDate
-        startDate.setHours(0, 0, 0, 0);
-
-        return savedBills.filter(bill => new Date(bill.date) >= startDate);
-    }, [savedBills, dateRange]);
+        return bills;
+    }, [savedBills, dateRange, departmentFilter]);
 
     const activeBills = useMemo(() => filteredBills.filter(b => b.status !== 'voided'), [filteredBills]);
     const voidedBills = useMemo(() => filteredBills.filter(b => b.status === 'voided'), [filteredBills]);
@@ -105,6 +119,20 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, onBack }) =
         return Object.entries(report).sort(([, a], [, b]) => b.count - a.count);
     }, [activeBills]);
 
+    const userCollectionReport = useMemo(() => {
+        const report: { [user: string]: { billsCreated: number, totalBilled: number, totalCollected: number } } = {};
+        activeBills.forEach(bill => {
+            const user = bill.billedBy;
+            if (!report[user]) {
+                report[user] = { billsCreated: 0, totalBilled: 0, totalCollected: 0 };
+            }
+            report[user].billsCreated++;
+            report[user].totalBilled += bill.totalAmount;
+            report[user].totalCollected += bill.paymentDetails.amountPaid;
+        });
+        return Object.entries(report).sort(([, a], [, b]) => b.totalBilled - a.totalBilled);
+    }, [activeBills]);
+
 
     return (
         <div className="space-y-6">
@@ -120,19 +148,36 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, onBack }) =
             </div>
 
             <div className="bg-white p-4 rounded-xl shadow-lg">
-                <div className="flex items-center gap-4">
-                     <label htmlFor="dateRange" className="text-sm font-medium text-slate-700">Date Range:</label>
-                     <select
-                        id="dateRange"
-                        value={dateRange}
-                        onChange={e => setDateRange(e.target.value)}
-                        className="p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                     >
-                        <option value="all">All Time</option>
-                        <option value="today">Today</option>
-                        <option value="7days">Last 7 Days</option>
-                        <option value="30days">Last 30 Days</option>
-                     </select>
+                <div className="flex items-center gap-6">
+                     <div className="flex items-center gap-2">
+                        <label htmlFor="dateRange" className="text-sm font-medium text-slate-700">Date Range:</label>
+                        <select
+                            id="dateRange"
+                            value={dateRange}
+                            onChange={e => setDateRange(e.target.value)}
+                            className="p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="all">All Time</option>
+                            <option value="today">Today</option>
+                            <option value="7days">Last 7 Days</option>
+                            <option value="30days">Last 30 Days</option>
+                        </select>
+                     </div>
+                     <div className="flex items-center gap-2">
+                        <label htmlFor="departmentFilter" className="text-sm font-medium text-slate-700">Department:</label>
+                        <select
+                            id="departmentFilter"
+                            value={departmentFilter}
+                            onChange={e => setDepartmentFilter(e.target.value)}
+                            className="p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="all">All Departments</option>
+                            <option value="Standard">Standard Bills</option>
+                            {departmentOptions.map(dept => (
+                                <option key={dept} value={dept}>{dept}</option>
+                            ))}
+                        </select>
+                     </div>
                 </div>
             </div>
 
@@ -160,6 +205,48 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, onBack }) =
                     subValue={`Totaling ₹${stats.voidedBillsValue.toFixed(2)}`}
                     icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>}
                 />
+            </div>
+             {/* User Collection Report */}
+            <div className="bg-white p-6 rounded-xl shadow-lg space-y-4">
+                <h3 className="text-xl font-bold text-slate-800 border-b pb-2">User Collection Report</h3>
+                <div className="overflow-x-auto max-h-96">
+                    <table className="min-w-full divide-y divide-slate-200">
+                            <thead className="bg-slate-50 sticky top-0">
+                            <tr>
+                                <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-slate-900 sm:pl-6">User</th>
+                                <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">Bills Created</th>
+                                <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">Total Billed Amount</th>
+                                <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">Total Payments Collected</th>
+                                <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">Difference</th>
+                                <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-slate-900">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 bg-white">
+                            {userCollectionReport.map(([user, data]) => {
+                                const difference = data.totalCollected - data.totalBilled;
+                                const isMismatch = Math.abs(difference) > 0.01;
+                                return (
+                                    <tr key={user} className={isMismatch ? 'bg-red-50' : ''}>
+                                        <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-slate-900 sm:pl-6">{user}</td>
+                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right">{data.billsCreated}</td>
+                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right">₹{data.totalBilled.toFixed(2)}</td>
+                                        <td className="whitespace-nowrap px-3 py-4 text-sm font-semibold text-slate-600 text-right">₹{data.totalCollected.toFixed(2)}</td>
+                                        <td className={`whitespace-nowrap px-3 py-4 text-sm font-semibold text-right ${isMismatch ? 'text-red-600' : 'text-slate-600'}`}>
+                                            ₹{difference.toFixed(2)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-center">
+                                            {isMismatch ? (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">⚠️ Mismatch</span>
+                                            ) : (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">OK</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

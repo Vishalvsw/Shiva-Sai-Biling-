@@ -1,4 +1,5 @@
 
+
 import React, { useMemo } from 'react';
 import { SavedBill } from '../types';
 
@@ -54,12 +55,24 @@ interface AdminDashboardProps {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onSelectView, savedBills }) => {
     
-    const { partialBillsCount, unpaidBillsCount, outstandingBalance } = useMemo(() => {
+    const { partialBillsCount, unpaidBillsCount, outstandingBalance, departmentRevenue } = useMemo(() => {
         const activeBills = savedBills.filter(b => b.status !== 'voided');
+        const deptRevenue: { [key: string]: { revenue: number, count: number } } = {};
+
+        activeBills.forEach(bill => {
+            const key = bill.department || 'Standard';
+            if (!deptRevenue[key]) {
+                deptRevenue[key] = { revenue: 0, count: 0 };
+            }
+            deptRevenue[key].revenue += bill.paymentDetails.amountPaid;
+            deptRevenue[key].count++;
+        });
+
         return {
             partialBillsCount: activeBills.filter(b => b.paymentStatus === 'Partial').length,
             unpaidBillsCount: activeBills.filter(b => b.paymentStatus === 'Unpaid').length,
             outstandingBalance: activeBills.reduce((sum, bill) => bill.paymentStatus !== 'Paid' ? sum + bill.balanceDue : sum, 0),
+            departmentRevenue: Object.entries(deptRevenue).sort(([, a], [, b]) => b.revenue - a.revenue),
         };
     }, [savedBills]);
 
@@ -117,6 +130,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onSelectView, savedBill
                  <StatSummaryCard title="Partially Paid Bills" value={partialBillsCount} color={partialBillsCount > 0 ? 'yellow' : 'slate'} />
                  <StatSummaryCard title="Unpaid Bills" value={unpaidBillsCount} color={unpaidBillsCount > 0 ? 'red' : 'slate'} />
             </div>
+            
+            {departmentRevenue.length > 0 && (
+                 <div className="pt-6 border-t">
+                     <h3 className="text-xl font-bold text-slate-700 mb-4">Revenue by Department</h3>
+                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        {departmentRevenue.map(([name, data]) => (
+                             <div key={name} className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-center">
+                                 <p className="text-sm font-semibold text-slate-600">{name}</p>
+                                 <p className="text-lg font-bold text-[#143A78]">₹{data.revenue.toFixed(2)}</p>
+                                 <p className="text-xs text-slate-500">{data.count} Bills</p>
+                             </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div className="pt-6 border-t">
                 <p className="text-slate-600 mb-4">Select an option below to manage the application.</p>

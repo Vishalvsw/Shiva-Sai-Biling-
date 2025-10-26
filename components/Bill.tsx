@@ -1,9 +1,12 @@
-import React, { useEffect } from 'react';
-import { BillItem, PatientDetails, PaymentDetails, AppSettings } from '../types';
+
+
+import React, { useEffect, useMemo } from 'react';
+import { BillItem, PatientDetails, PaymentDetails, AppSettings, SavedBill, TestCategory } from '../types';
 import Barcode from './Barcode';
 
 interface BillProps {
     items: BillItem[];
+    testData: TestCategory[];
     patientDetails: PatientDetails;
     billNumber: number;
     totalDiscount: number;
@@ -11,6 +14,7 @@ interface BillProps {
     commissionRate: number;
     userRole: 'admin' | 'user';
     isViewingArchived: boolean;
+    viewedBillDetails: SavedBill | null;
     settings: AppSettings;
     onPatientDetailsChange: (details: PatientDetails) => void;
     onRemoveItem: (testId: string) => void;
@@ -24,6 +28,7 @@ interface BillProps {
 
 const Bill: React.FC<BillProps> = ({ 
     items, 
+    testData,
     patientDetails, 
     billNumber, 
     totalDiscount,
@@ -31,6 +36,7 @@ const Bill: React.FC<BillProps> = ({
     commissionRate,
     userRole,
     isViewingArchived,
+    viewedBillDetails,
     settings,
     onPatientDetailsChange, 
     onRemoveItem, 
@@ -56,6 +62,23 @@ const Bill: React.FC<BillProps> = ({
     const tax = taxableAmount * settings.taxRate;
     const total = taxableAmount + tax;
     const balanceDue = total - paymentDetails.amountPaid;
+
+    const showPaymentMismatchWarning = !isViewingArchived && paymentDetails.amountPaid > total && total > 0;
+
+    const billTitle = useMemo(() => {
+        if (isViewingArchived) {
+            return viewedBillDetails?.department ? `${viewedBillDetails.department} Bill` : 'Standard Lab Bill';
+        }
+        if (items.length > 0) {
+            const firstItem = items[0];
+            const category = testData.find(cat => cat.tests.some(t => t.id === firstItem.id));
+            if (category?.isMajor) {
+                return `${category.category} Bill`;
+            }
+        }
+        return 'Standard Lab Bill';
+    }, [items, isViewingArchived, viewedBillDetails, testData]);
+
 
     // Automatically set amount paid to total if total is >= 5000 for a new bill
     useEffect(() => {
@@ -111,6 +134,13 @@ const Bill: React.FC<BillProps> = ({
     return (
         <>
             <div className="bg-white p-6 rounded-xl shadow-lg relative print:p-4 print:shadow-none print:border-none" id="bill-section">
+                {isViewingArchived && viewedBillDetails?.verificationStatus === 'Pending' && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none print:flex z-10">
+                    <div className="text-6xl sm:text-8xl font-black text-red-500 text-opacity-20 transform -rotate-45 border-4 border-red-500 border-opacity-20 p-4 rounded-lg">
+                      PROVISIONAL BILL
+                    </div>
+                  </div>
+                )}
                 {/* Printable Header */}
                 <div className="hidden print:block mb-6">
                     <div className="text-center">
@@ -132,7 +162,7 @@ const Bill: React.FC<BillProps> = ({
                 {/* Patient Details Section */}
                 <div className="mb-6 border-b pb-6 print:border-none print:pb-0 print:mb-2">
                      <h2 className="text-2xl font-bold text-slate-800 sm:col-span-2 print:hidden mb-4">
-                        {isViewingArchived ? `Viewing Bill #${String(billNumber).padStart(6, '0')}` : 'Patient Bill'}
+                        {isViewingArchived ? `Viewing Bill #${String(billNumber).padStart(6, '0')}` : billTitle}
                     </h2>
                      <div className="grid grid-cols-2 gap-4 mb-4 print:mb-2 print:text-sm">
                         <div>
@@ -350,6 +380,9 @@ const Bill: React.FC<BillProps> = ({
                                     />
                                 </div>
                             </div>
+                             {showPaymentMismatchWarning && (
+                                <p className="text-red-600 text-sm text-right">⚠️ Warning: Amount paid is higher than total.</p>
+                            )}
                         </div>
                         
                         {/* Print Display */}
@@ -440,6 +473,7 @@ const Bill: React.FC<BillProps> = ({
                             <tr className="font-bold border-t border-dashed border-black"><td className="pt-1">Grand Total:</td><td className="pt-1 text-right">₹{total.toFixed(2)}</td></tr>
                             <tr><td>Amount Paid:</td><td className="text-right">₹{paymentDetails.amountPaid.toFixed(2)}</td></tr>
                             <tr className="font-bold"><td className="pb-1">Balance Due:</td><td className="pb-1 text-right">₹{balanceDue.toFixed(2)}</td></tr>
+                            <tr className="border-t border-dashed border-black"><td className="pt-1">Total Items:</td><td className="pt-1 text-right">{items.length}</td></tr>
                         </tbody>
                     </table>
                 </div>

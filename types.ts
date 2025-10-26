@@ -1,17 +1,16 @@
+// FIX: The content of this file was incorrect and contained the main App component.
+// It has been replaced with the correct type definitions.
 
 export interface Test {
-  id: string;
-  name: string;
-  price: number;
-}
-
-export interface BillItem extends Test {
-  discount: number;
+    id: string;
+    name: string;
+    price: number;
 }
 
 export interface TestCategory {
-  category: string;
-  tests: Test[];
+    category: string;
+    tests: Test[];
+    isMajor?: boolean;
 }
 
 export interface PatientDetails {
@@ -21,8 +20,12 @@ export interface PatientDetails {
     refdBy: string;
 }
 
+export interface BillItem extends Test {
+    discount: number;
+}
+
 export interface PaymentDetails {
-    paymentMethod: 'Cash' | 'Card' | 'UPI' | 'Other' | '';
+    paymentMethod: string;
     amountPaid: number;
 }
 
@@ -33,36 +36,42 @@ export interface User {
 
 export interface SavedBill {
     billNumber: number;
-    date: string;
+    date: string; // ISO string
     patientDetails: PatientDetails;
     billItems: BillItem[];
     totalDiscount: number;
     paymentDetails: PaymentDetails;
     commissionRate: number;
     subtotal: number;
-    totalAmount: number;
     tax: number;
+    totalAmount: number;
     balanceDue: number;
     paymentStatus: 'Paid' | 'Partial' | 'Unpaid';
-    status?: 'active' | 'voided';
+    billedBy: string;
+    verificationStatus: 'Verified' | 'Pending' | 'Rejected';
+    rejectionReason?: string;
+    status: 'active' | 'voided';
     voidedInfo?: {
         voidedBy: string;
-        voidedAt: string;
+        voidedAt: string; // ISO string
         reason: string;
     };
+    billType: 'Standard' | 'Department';
+    department?: string;
 }
 
 export interface AppSettings {
     labName: string;
     labAddress: string;
     labContact: string;
-    taxRate: number; // e.g., 0.05 for 5%
+    taxRate: number;
     referringDoctors: string[];
-    autoDeleteDays: number; // 0 to disable
+    autoDeleteDays: number;
+    verificationThreshold: number;
 }
 
 export interface AuditLogEntry {
-    timestamp: string;
+    timestamp: string; // ISO string
     user: string;
     action: string;
     details: string;

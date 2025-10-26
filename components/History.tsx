@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import { SavedBill, User } from '../types';
 
@@ -6,10 +7,11 @@ interface HistoryProps {
     savedBills: SavedBill[];
     onViewBill: (bill: SavedBill) => void;
     onVoidBill: (billNumber: number, reason: string) => void;
+    onVerifyBill: (billNumber: number, isApproved: boolean, reason?: string) => void;
     currentUser: User;
 }
 
-const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, currentUser }) => {
+const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, onVerifyBill, currentUser }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showVoided, setShowVoided] = useState(false);
 
@@ -23,6 +25,15 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, c
             onVoidBill(bill.billNumber, reason.trim());
         } else if (reason !== null) { // User didn't click cancel
             alert('A reason is required to void a bill.');
+        }
+    };
+
+    const handleRejectClick = (bill: SavedBill) => {
+        const reason = prompt(`Please provide a reason for rejecting Bill #${String(bill.billNumber).padStart(6, '0')}:`);
+        if (reason && reason.trim()) {
+            onVerifyBill(bill.billNumber, false, reason.trim());
+        } else if (reason !== null) {
+             alert('A reason is required to reject a bill.');
         }
     };
 
@@ -40,22 +51,37 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, c
         const lowercasedFilter = searchTerm.toLowerCase();
         return bills.filter(bill =>
             bill.patientDetails.name.toLowerCase().includes(lowercasedFilter) ||
-            String(bill.billNumber).includes(lowercasedFilter)
+            String(bill.billNumber).includes(lowercasedFilter) ||
+            bill.billedBy.toLowerCase().includes(lowercasedFilter) ||
+            (bill.department && bill.department.toLowerCase().includes(lowercasedFilter))
         );
     }, [sortedBills, searchTerm, showVoided, currentUser.role]);
 
-    const getStatusBadge = (status: 'Paid' | 'Partial' | 'Unpaid') => {
+    const getPaymentStatusBadge = (status: 'Paid' | 'Partial' | 'Unpaid') => {
         switch (status) {
-            case 'Paid':
-                return 'bg-green-100 text-green-800';
-            case 'Partial':
-                return 'bg-yellow-100 text-yellow-800';
-            case 'Unpaid':
-                return 'bg-red-100 text-red-800';
-            default:
-                return 'bg-gray-100 text-gray-800';
+            case 'Paid': return 'bg-green-100 text-green-800';
+            case 'Partial': return 'bg-yellow-100 text-yellow-800';
+            case 'Unpaid': return 'bg-red-100 text-red-800';
+            default: return 'bg-gray-100 text-gray-800';
         }
     };
+    
+    const getVerificationStatusBadge = (status: 'Verified' | 'Pending' | 'Rejected') => {
+        switch (status) {
+            case 'Verified': return 'bg-blue-100 text-blue-800';
+            case 'Pending': return 'bg-orange-100 text-orange-800';
+            case 'Rejected': return 'bg-red-100 text-red-800';
+            default: return 'bg-gray-100 text-gray-800';
+        }
+    };
+
+    const getBillTypeBadge = (bill: SavedBill) => {
+        if (bill.billType === 'Department') {
+            return 'bg-purple-100 text-purple-800';
+        }
+        return 'bg-gray-100 text-gray-800';
+    }
+
 
     return (
         <div className="bg-white p-6 rounded-xl shadow-lg space-y-4">
@@ -79,7 +105,7 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, c
             
             <input
                 type="text"
-                placeholder="Search by patient name or bill number..."
+                placeholder="Search by patient, bill number, user, or department..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 className="w-full max-w-lg p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -91,10 +117,12 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, c
                             <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-slate-900 sm:pl-6">Bill No.</th>
                             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Date</th>
                             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Patient Name</th>
+                            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Bill Type</th>
+                            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Billed By</th>
                             <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">Total</th>
-                            <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">Balance</th>
-                            <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-slate-900">Payment Status</th>
-                            <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                            <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-slate-900">Payment</th>
+                            <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-slate-900">Verification</th>
+                            <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6 text-right">
                                 <span className="sr-only">Actions</span>
                             </th>
                         </tr>
@@ -102,31 +130,50 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, c
                     <tbody className="divide-y divide-slate-200 bg-white">
                         {filteredBills.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="text-center py-10 text-slate-500 italic">
+                                <td colSpan={9} className="text-center py-10 text-slate-500 italic">
                                     {savedBills.length === 0 ? 'No bills have been saved yet.' : 'No matching bills found.'}
                                 </td>
                             </tr>
                         ) : (
                             filteredBills.map((bill) => (
-                                <tr key={bill.billNumber} className={bill.status === 'voided' ? 'bg-red-50 opacity-70' : 'hover:bg-slate-50'}>
+                                <tr key={bill.billNumber} className={bill.status === 'voided' ? 'bg-red-50 opacity-70' : bill.verificationStatus === 'Pending' ? 'bg-orange-50' : 'hover:bg-slate-50'}>
                                     <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-slate-900 sm:pl-6">{String(bill.billNumber).padStart(6, '0')}</td>
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">{new Date(bill.date).toLocaleDateString()}</td>
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">{bill.patientDetails.name}</td>
-                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right">₹{bill.totalAmount.toFixed(2)}</td>
-                                    <td className={`whitespace-nowrap px-3 py-4 text-sm text-right font-medium ${bill.balanceDue > 0 ? 'text-red-600' : 'text-green-600'}`}>₹{bill.balanceDue.toFixed(2)}</td>
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-center">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(bill.paymentStatus)}`}>
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBillTypeBadge(bill)}`}>
+                                            {bill.department || 'Standard'}
+                                        </span>
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">{bill.billedBy}</td>
+                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right">₹{bill.totalAmount.toFixed(2)}</td>
+                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-center">
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusBadge(bill.paymentStatus)}`}>
                                             {bill.paymentStatus}
                                         </span>
                                     </td>
-                                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 space-x-4">
-                                        <button onClick={() => onViewBill(bill)} className="text-orange-600 hover:text-orange-900 disabled:text-slate-400 disabled:cursor-not-allowed" disabled={bill.status === 'voided'}>
-                                            View
-                                        </button>
-                                        {currentUser.role === 'admin' && bill.status !== 'voided' && (
-                                            <button onClick={() => handleVoidClick(bill)} className="text-red-600 hover:text-red-900">
-                                                Void
-                                            </button>
+                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-center">
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getVerificationStatusBadge(bill.verificationStatus)}`} title={bill.rejectionReason}>
+                                            {bill.verificationStatus}
+                                        </span>
+                                    </td>
+                                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 space-x-2">
+                                        {currentUser.role === 'admin' && bill.verificationStatus === 'Pending' ? (
+                                            <>
+                                                <button onClick={() => onVerifyBill(bill.billNumber, true)} className="text-green-600 hover:text-green-900">Approve</button>
+                                                <button onClick={() => handleRejectClick(bill)} className="text-red-600 hover:text-red-900">Reject</button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button onClick={() => onViewBill(bill)} className="text-orange-600 hover:text-orange-900 disabled:text-slate-400 disabled:cursor-not-allowed" disabled={bill.status === 'voided'}>
+                                                    View
+                                                </button>
+                                                {currentUser.role === 'admin' && bill.status !== 'voided' && (
+                                                    <button onClick={() => handleVoidClick(bill)} className="text-red-600 hover:text-red-900">
+                                                        Void
+                                                    </button>
+                                                )}
+                                            </>
                                         )}
                                         {bill.status === 'voided' && (
                                             <span className="font-bold text-red-500">VOIDED</span>

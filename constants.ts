@@ -111,4 +111,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
     taxRate: 0.05,
     referringDoctors: REFERRING_DOCTORS,
     autoDeleteDays: 45, // 0 to disable
+    verificationThreshold: 1000, // Bills above this amount need admin verification
 };
