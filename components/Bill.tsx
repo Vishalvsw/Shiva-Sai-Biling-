@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BillItem, PatientDetails, PaymentDetails, AppSettings } from '../types';
 import Barcode from './Barcode';
 
@@ -57,6 +57,19 @@ const Bill: React.FC<BillProps> = ({
     const total = taxableAmount + tax;
     const balanceDue = total - paymentDetails.amountPaid;
 
+    // Automatically set amount paid to total if total is >= 5000 for a new bill
+    useEffect(() => {
+        if (!isViewingArchived && total >= 5000) {
+            // To avoid potential loops, only update if the value is not already correct
+            if (paymentDetails.amountPaid !== total) {
+                onPaymentDetailsChange({
+                    ...paymentDetails,
+                    amountPaid: total,
+                });
+            }
+        }
+    }, [total, isViewingArchived, paymentDetails, onPaymentDetailsChange]);
+
     const handlePrint = () => {
         window.print();
     };
@@ -93,6 +106,7 @@ const Bill: React.FC<BillProps> = ({
     };
 
     const isSaveDisabled = items.length === 0 || patientDetails.name.trim() === '' || isViewingArchived;
+    const isAmountPaidDisabled = total >= 5000 && !isViewingArchived;
 
     return (
         <>
@@ -330,7 +344,9 @@ const Bill: React.FC<BillProps> = ({
                                         value={paymentDetails.amountPaid > 0 ? paymentDetails.amountPaid : ''}
                                         onChange={handlePaymentChange}
                                         placeholder="0.00"
-                                        className="w-28 rounded-md border-slate-300 py-1 pl-7 pr-2 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                        className="w-28 rounded-md border-slate-300 py-1 pl-7 pr-2 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                        disabled={isAmountPaidDisabled}
+                                        title={isAmountPaidDisabled ? "Full payment is required for bills of ₹5000 or more." : "Enter amount paid by patient"}
                                     />
                                 </div>
                             </div>

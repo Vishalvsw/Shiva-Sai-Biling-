@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { Test, PatientDetails, BillItem, PaymentDetails, User, SavedBill, AppSettings, TestCategory } from './types';
+import { Test, PatientDetails, BillItem, PaymentDetails, User, SavedBill, AppSettings, TestCategory, AuditLogEntry } from './types';
 import { DEFAULT_TEST_DATA, DEFAULT_SETTINGS } from './constants';
 import { USERS } from './users';
 import TestSelector from './components/TestSelector';
@@ -15,9 +16,11 @@ import BackupRestore from './components/BackupRestore';
 import Settings from './components/Settings';
 import SplashScreen from './components/SplashScreen';
 import Footer from './components/Footer';
+import ActivityLog from './components/ActivityLog';
+import Workflow from './components/Workflow';
 
 
-type AdminView = 'main' | 'reports' | 'users' | 'tests' | 'backup' | 'settings';
+type AdminView = 'main' | 'reports' | 'users' | 'tests' | 'backup' | 'settings' | 'activity' | 'workflow';
 type AppUser = { password: string; role: 'admin' | 'user' };
 
 const App: React.FC = () => {
@@ -92,6 +95,11 @@ const App: React.FC = () => {
         const saved = localStorage.getItem('savedBills');
         return saved ? JSON.parse(saved) : [];
     });
+
+    const [auditLog, setAuditLog] = useState<AuditLogEntry[]>(() => {
+        const saved = localStorage.getItem('auditLog');
+        return saved ? JSON.parse(saved) : [];
+    });
     
     // --- EFFECTS ---
      useEffect(() => {
@@ -112,6 +120,7 @@ const App: React.FC = () => {
     useEffect(() => { localStorage.setItem('testData', JSON.stringify(testData)); }, [testData]);
     useEffect(() => { localStorage.setItem('appSettings', JSON.stringify(settings)); }, [settings]);
     useEffect(() => { localStorage.setItem('savedBills', JSON.stringify(savedBills)); }, [savedBills]);
+    useEffect(() => { localStorage.setItem('auditLog', JSON.stringify(auditLog)); }, [auditLog]);
 
     // Current bill persistence effects
     useEffect(() => { if(viewMode !== 'billing') return; localStorage.setItem('patientDetails', JSON.stringify(patientDetails)); }, [patientDetails, viewMode]);
@@ -137,6 +146,17 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [settings.autoDeleteDays]); // Only run on initial load
 
+    // --- LOGGING ---
+    const logAction = useCallback((action: string, details: string) => {
+        if (!currentUser) return;
+        const newEntry: AuditLogEntry = {
+            timestamp: new Date().toISOString(),
+            user: currentUser.username,
+            action,
+            details,
+        };
+        setAuditLog(prev => [newEntry, ...prev]);
+    }, [currentUser]);
 
     // --- HANDLERS ---
     const handleLogin = (username: string, password: string): boolean => {
@@ -144,6 +164,16 @@ const App: React.FC = () => {
         if (userInDb && userInDb.password === password) {
             const user: User = { username, role: userInDb.role };
             setCurrentUser(user);
+
+            // Log action immediately after setting user
+            const newEntry: AuditLogEntry = {
+                timestamp: new Date().toISOString(),
+                user: user.username,
+                action: 'LOGIN',
+                details: `User logged in.`,
+            };
+            setAuditLog(prev => [newEntry, ...prev]);
+
             const initialView = user.role === 'admin' ? 'dashboard' : 'billing';
             setViewMode(initialView);
             setAdminView('main');
@@ -153,6 +183,7 @@ const App: React.FC = () => {
     };
 
     const handleLogout = () => {
+        logAction('LOGOUT', `User logged out.`);
         setCurrentUser(null);
         setAdminView('main');
     };
@@ -182,6 +213,10 @@ const App: React.FC = () => {
     }, []);
 
     const handleClearBill = useCallback(() => {
+        if (billItems.length > 0) {
+            logAction('BILL_CLEARED', `Cleared unsaved bill #${billNumber}.`);
+        }
+        
         const newBillNumber = Math.max(
             parseInt(localStorage.getItem('lastBillNumber') || '0', 10),
             ...savedBills.map(b => b.billNumber)
@@ -194,7 +229,7 @@ const App: React.FC = () => {
         setCommissionRate(0);
         setBillNumber(newBillNumber);
         setIsViewingArchived(false);
-    }, [savedBills]);
+    }, [savedBills, billItems.length, billNumber, logAction]);
 
     const handleSaveBill = useCallback(() => {
         const subtotal = billItems.reduce((acc, item) => acc + item.price, 0);
@@ -205,6 +240,15 @@ const App: React.FC = () => {
         const tax = taxableAmount * settings.taxRate;
         const total = taxableAmount + tax;
         const balanceDue = total - paymentDetails.amountPaid;
+
+        let paymentStatus: 'Paid' | 'Partial' | 'Unpaid';
+        if (paymentDetails.amountPaid <= 0 && total > 0) {
+            paymentStatus = 'Unpaid';
+        } else if (balanceDue > 0) {
+            paymentStatus = 'Partial';
+        } else {
+            paymentStatus = 'Paid'; // Covers full payment and overpayment
+        }
 
         const newSavedBill: SavedBill = {
             billNumber,
@@ -218,12 +262,36 @@ const App: React.FC = () => {
             tax,
             totalAmount: total,
             balanceDue,
+            paymentStatus,
+            status: 'active',
         };
         
+        logAction('BILL_SAVED', `Bill #${billNumber} saved for "${patientDetails.name}". Total: ₹${total.toFixed(2)}, Paid: ₹${paymentDetails.amountPaid.toFixed(2)}, Status: ${paymentStatus}.`);
         setSavedBills(prev => [...prev, newSavedBill]);
         localStorage.setItem('lastBillNumber', billNumber.toString());
         handleClearBill();
-    }, [billItems, patientDetails, totalDiscount, paymentDetails, commissionRate, billNumber, handleClearBill, settings.taxRate]);
+    }, [billItems, patientDetails, totalDiscount, paymentDetails, commissionRate, billNumber, handleClearBill, settings.taxRate, logAction]);
+
+    const handleVoidBill = useCallback((billNumberToVoid: number, reason: string) => {
+        if (!currentUser) return;
+        
+        setSavedBills(prevBills => 
+            prevBills.map(bill => 
+                bill.billNumber === billNumberToVoid 
+                ? { 
+                    ...bill, 
+                    status: 'voided',
+                    voidedInfo: {
+                        voidedBy: currentUser.username,
+                        voidedAt: new Date().toISOString(),
+                        reason,
+                    }
+                  }
+                : bill
+            )
+        );
+        logAction('BILL_VOIDED', `Bill #${billNumberToVoid} was voided. Reason: ${reason}`);
+    }, [currentUser, logAction]);
 
     const handleViewArchivedBill = useCallback((bill: SavedBill) => {
         setBillNumber(bill.billNumber);
@@ -296,7 +364,7 @@ const App: React.FC = () => {
                     </div>
                 );
             case 'history':
-                return <History savedBills={savedBills} onViewBill={handleViewArchivedBill} />;
+                return <History savedBills={savedBills} onViewBill={handleViewArchivedBill} onVoidBill={handleVoidBill} currentUser={currentUser} />;
             case 'dashboard':
                 if (currentUser.role === 'admin') {
                     switch(adminView) {
@@ -310,9 +378,13 @@ const App: React.FC = () => {
                             return <BackupRestore onBack={() => setAdminView('main')} />;
                         case 'settings':
                             return <Settings settings={settings} setSettings={setSettings} onBack={() => setAdminView('main')} />;
+                        case 'activity':
+                            return <ActivityLog auditLog={auditLog} onBack={() => setAdminView('main')} />;
+                        case 'workflow':
+                            return <Workflow onBack={() => setAdminView('main')} />;
                         case 'main':
                         default:
-                            return <AdminDashboard onSelectView={setAdminView} />;
+                            return <AdminDashboard onSelectView={setAdminView} savedBills={savedBills} />;
                     }
                 }
                 // Fallback for non-admins trying to access dashboard

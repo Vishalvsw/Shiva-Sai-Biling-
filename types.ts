@@ -1,5 +1,4 @@
 
-
 export interface Test {
   id: string;
   name: string;
@@ -44,6 +43,13 @@ export interface SavedBill {
     totalAmount: number;
     tax: number;
     balanceDue: number;
+    paymentStatus: 'Paid' | 'Partial' | 'Unpaid';
+    status?: 'active' | 'voided';
+    voidedInfo?: {
+        voidedBy: string;
+        voidedAt: string;
+        reason: string;
+    };
 }
 
 export interface AppSettings {
@@ -53,4 +59,11 @@ export interface AppSettings {
     taxRate: number; // e.g., 0.05 for 5%
     referringDoctors: string[];
     autoDeleteDays: number; // 0 to disable
+}
+
+export interface AuditLogEntry {
+    timestamp: string;
+    user: string;
+    action: string;
+    details: string;
 }
