@@ -1,5 +1,4 @@
 
-
 import React, { useState, useMemo } from 'react';
 import { SavedBill, BillItem, TestCategory } from '../types';
 
@@ -66,14 +65,16 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, o
         return bills;
     }, [savedBills, dateRange, departmentFilter]);
 
-    const activeBills = useMemo(() => filteredBills.filter(b => b.status !== 'voided'), [filteredBills]);
+    const activeBills = useMemo(() => filteredBills.filter(b => b.status !== 'voided' && b.verificationStatus !== 'Rejected'), [filteredBills]);
     const voidedBills = useMemo(() => filteredBills.filter(b => b.status === 'voided'), [filteredBills]);
+    const rejectedBills = useMemo(() => filteredBills.filter(b => b.verificationStatus === 'Rejected' && b.status !== 'voided'), [filteredBills]);
 
     const stats = useMemo(() => {
         const totalRevenue = activeBills.reduce((sum, bill) => sum + bill.paymentDetails.amountPaid, 0);
         const outstandingBills = activeBills.filter(b => b.paymentStatus === 'Partial' || b.paymentStatus === 'Unpaid');
         const outstandingBalance = outstandingBills.reduce((sum, bill) => sum + bill.balanceDue, 0);
         const voidedBillsValue = voidedBills.reduce((sum, bill) => sum + bill.totalAmount, 0);
+        const rejectedBillsValue = rejectedBills.reduce((sum, bill) => sum + bill.totalAmount, 0);
 
         return {
             totalRevenue,
@@ -82,8 +83,10 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, o
             outstandingCount: outstandingBills.length,
             voidedBillsCount: voidedBills.length,
             voidedBillsValue,
+            rejectedBillsCount: rejectedBills.length,
+            rejectedBillsValue,
         };
-    }, [activeBills, voidedBills]);
+    }, [activeBills, voidedBills, rejectedBills]);
 
 
     const doctorReport = useMemo(() => {
@@ -182,14 +185,14 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, o
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <StatCard 
                     title="Total Revenue (Paid)" 
                     value={`₹${stats.totalRevenue.toFixed(2)}`} 
                     icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
                 />
                  <StatCard 
-                    title="Active Bills" 
+                    title="Verified Bills" 
                     value={stats.totalBills} 
                     icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
                 />
@@ -204,6 +207,12 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, o
                     value={stats.voidedBillsCount} 
                     subValue={`Totaling ₹${stats.voidedBillsValue.toFixed(2)}`}
                     icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>}
+                />
+                 <StatCard 
+                    title="Rejected Bills" 
+                    value={stats.rejectedBillsCount} 
+                    subValue={`Totaling ₹${stats.rejectedBillsValue.toFixed(2)}`}
+                    icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
                 />
             </div>
              {/* User Collection Report */}

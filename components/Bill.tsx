@@ -338,16 +338,6 @@ const Bill: React.FC<BillProps> = ({
                         <span className="text-base font-bold text-slate-900">Grand Total:</span>
                         <span className="text-base font-bold text-slate-900 w-28">₹{total.toFixed(2)}</span>
                     </div>
-                    
-                    {/* --- Reference Commission (Screen Only) --- */}
-                    {userRole === 'admin' && commissionAmount > 0 && (
-                         <div className="flex justify-end gap-4 pt-2 border-t border-dashed print:hidden">
-                            <span className="text-sm font-medium text-slate-500">Reference Commission:</span>
-                            <span className="text-sm font-semibold text-orange-600 w-28">
-                                ₹{commissionAmount.toFixed(2)}
-                            </span>
-                        </div>
-                    )}
 
                     {/* --- Payment Details --- */}
                     <div className="pt-4 mt-4 border-t border-dashed space-y-2">
