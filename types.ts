@@ -7,6 +7,8 @@ export interface Test {
     name: string;
     price: number;
     subcategory?: string; // Added for tree-view organization
+    commissionDay?: number;
+    commissionNight?: number;
 }
 
 export interface TestCategory {

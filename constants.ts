@@ -6,7 +6,7 @@ export const DEFAULT_TEST_DATA: TestCategory[] = [
   {
     category: 'HAEMATOLOGY',
     tests: [
-      { id: 'h1', name: 'CBC', price: 350 },
+      { id: 'h1', name: 'CBC', price: 250, commissionDay: 50, commissionNight: 50 },
       { id: 'h2', name: 'Hb%', price: 100 },
       { id: 'h3', name: 'TC & DC', price: 150 },
       { id: 'h4', name: 'RBC count', price: 120 },
@@ -22,7 +22,7 @@ export const DEFAULT_TEST_DATA: TestCategory[] = [
   {
     category: 'CLINICAL PATHOLOGY',
     tests: [
-      { id: 'cp1', name: 'Urine routine & Microscopy', price: 150, subcategory: 'Urine Analysis' },
+      { id: 'cp1', name: 'Urine routine & Microscopy', price: 100, subcategory: 'Urine Analysis', commissionDay: 10, commissionNight: 10 },
       { id: 'cp2', name: 'Urine for microalbuminurea', price: 300, subcategory: 'Urine Analysis' },
       { id: 'cp3', name: 'Urine sugar', price: 50, subcategory: 'Urine Analysis' },
       { id: 'cp4', name: 'Urine Bile salt / Bile pigment', price: 100, subcategory: 'Urine Analysis' },
@@ -71,6 +71,7 @@ export const DEFAULT_TEST_DATA: TestCategory[] = [
       { id: 'el2', name: 'Potassium', price: 150 },
       { id: 'el3', name: 'Chloride', price: 150 },
       { id: 'el4', name: 'Calcium', price: 200 },
+      { id: 'el5', name: 'Serum Electrolytes (Na, K, Cl)', price: 500, subcategory: 'Profile', commissionDay: 100, commissionNight: 100 },
     ]
   },
   {
@@ -79,7 +80,7 @@ export const DEFAULT_TEST_DATA: TestCategory[] = [
         { id: 'sm1', name: 'Double Marker Test', price: 2200 },
         { id: 'sm2', name: 'Widal test', price: 150 },
         { id: 'sm3', name: 'VDRL test', price: 150 },
-        { id: 'sm4', name: 'HIV', price: 400 },
+        { id: 'sm4', name: 'HIV', price: 350, commissionDay: 75, commissionNight: 75 },
         { id: 'sm5', name: 'HbsAg', price: 300 },
         { id: 'sm6', name: 'HCV', price: 600 },
         { id: 'sm7', name: 'Dengue', price: 800 },
@@ -115,7 +116,9 @@ export const DEFAULT_TEST_DATA: TestCategory[] = [
         { id: 'b3', name: 'Blood sugar - Post Prandial', price: 80, subcategory: 'Blood Sugar' },
         { id: 'b4', name: 'Blood sugar - Random', price: 80, subcategory: 'Blood Sugar' },
         { id: 'b5', name: 'GCT/OGCT', price: 200, subcategory: 'Blood Sugar' },
-        { id: 'b6', name: 'HbA1c', price: 450 },
+        { id: 'b6', name: 'HbA1c', price: 600, commissionDay: 100, commissionNight: 100 },
+        { id: 'b13', name: 'RFT (Renal Function Test)', price: 400, subcategory: 'Profiles', commissionDay: 100, commissionNight: 100 },
+        { id: 'b14', name: 'LFT (Liver Function Test)', price: 600, subcategory: 'Profiles', commissionDay: 100, commissionNight: 100 },
         { id: 'b7', name: 'Total Cholestral', price: 200, subcategory: 'Lipid Profile' },
         { id: 'b8', name: 'LDL', price: 250, subcategory: 'Lipid Profile' },
         { id: 'b9', name: 'HDL', price: 250, subcategory: 'Lipid Profile' },
@@ -127,8 +130,8 @@ export const DEFAULT_TEST_DATA: TestCategory[] = [
   {
     category: 'LIVER FUNCTION TESTS',
     tests: [
-      { id: 'lft1', name: 'Serum Bilirubin - Direct', price: 150, subcategory: 'Bilirubin' },
-      { id: 'lft2', name: 'Serum Bilirubin - Indirect', price: 150, subcategory: 'Bilirubin' },
+      { id: 'lft1', name: 'Serum Bilirubin - Direct', price: 150, subcategory: 'Bilirubin', commissionDay: 10, commissionNight: 10 },
+      { id: 'lft2', name: 'Serum Bilirubin - Indirect', price: 150, subcategory: 'Bilirubin', commissionDay: 10, commissionNight: 10 },
       { id: 'lft3', name: 'SGOT', price: 180 },
       { id: 'lft4', name: 'SGPT', price: 180 },
       { id: 'lft5', name: 'Alk.Phosphatase', price: 200 },
@@ -156,7 +159,7 @@ export const DEFAULT_TEST_DATA: TestCategory[] = [
   {
     category: 'HEALTH PACKAGE',
     tests: [
-        { id: 'hp1', name: 'Basic health check up', price: 999 },
+        { id: 'hp1', name: 'Basic health check up', price: 3000, commissionDay: 300, commissionNight: 300 },
         { id: 'hp2', name: 'Master health check up - male', price: 2499 },
         { id: 'hp3', name: 'Master health check up - female', price: 2999 },
         { id: 'hp4', name: 'Pre - operative package', price: 1500 },
@@ -168,7 +171,7 @@ export const DEFAULT_TEST_DATA: TestCategory[] = [
     category: 'CT SCAN',
     isMajor: true,
     tests: [
-      { id: 'ct1', name: 'CT Brain', price: 2000, subcategory: 'Brain & Head' },
+      { id: 'ct1', name: 'CT Brain', price: 3000, subcategory: 'Brain & Head', commissionDay: 100, commissionNight: 125 },
       { id: 'ct2', name: 'CT PNS', price: 2500, subcategory: 'Brain & Head' },
       { id: 'ct3', name: 'CT Orbits', price: 3000, subcategory: 'Brain & Head' },
       { id: 'ct4', name: 'CT Face', price: 3000, subcategory: 'Brain & Head' },
@@ -176,6 +179,8 @@ export const DEFAULT_TEST_DATA: TestCategory[] = [
       { id: 'ct6', name: 'HRCT - Thorax', price: 3500, subcategory: 'Body' },
       { id: 'ct7', name: 'CT Chest', price: 3500, subcategory: 'Body' },
       { id: 'ct8', name: 'CT KUB', price: 3000, subcategory: 'Body' },
+      { id: 'ct31', name: 'CT Abdomen - Plain', price: 4000, subcategory: 'Body', commissionDay: 150, commissionNight: 175 },
+      { id: 'ct32', name: 'CT Abdomen - Contrast', price: 5000, subcategory: 'Body', commissionDay: 150, commissionNight: 200 },
       { id: 'ct9', name: 'CT Abdomen + Pelvis', price: 4500, subcategory: 'Body' },
       { id: 'ct10', name: 'CT Pelvis', price: 3000, subcategory: 'Body' },
       { id: 'ct11', name: 'CT Neck', price: 3000, subcategory: 'Body' },
@@ -204,19 +209,21 @@ export const DEFAULT_TEST_DATA: TestCategory[] = [
     category: 'ULTRASONOGRAPHY',
     isMajor: true,
     tests: [
+      { id: 'us22', name: 'USG Abdomen', price: 900, subcategory: 'General Imaging', commissionDay: 100, commissionNight: 125 },
       { id: 'us1', name: 'USG Pelvis', price: 800, subcategory: 'General Imaging' },
       { id: 'us2', name: 'USG Abdomen & Pelvis', price: 1200, subcategory: 'General Imaging' },
       { id: 'us3', name: 'USG KUB', price: 800, subcategory: 'General Imaging' },
       { id: 'us4', name: 'USG Chest', price: 800, subcategory: 'General Imaging' },
       { id: 'us5', name: 'Neurosonogram', price: 1000, subcategory: 'General Imaging' },
       { id: 'us6', name: 'Follicular Study', price: 500, subcategory: 'General Imaging' },
+      { id: 'us23', name: 'Doppler (General)', price: 1500, subcategory: 'General Imaging', commissionDay: 175, commissionNight: 200 },
       { id: 'us7', name: 'Early pregnancy', price: 1000, subcategory: 'OBG Scanning' },
-      { id: 'us8', name: 'NT scan (11 - 14 weeks)', price: 1500, subcategory: 'OBG Scanning' },
+      { id: 'us8', name: 'NT scan (11 - 14 weeks)', price: 1200, subcategory: 'OBG Scanning', commissionDay: 150, commissionNight: 175 },
       { id: 'us9', name: 'TIFFA / Anomaly scan', price: 2000, subcategory: 'OBG Scanning' },
-      { id: 'us10', name: 'OBG 3D/4D live scan', price: 2500, subcategory: 'OBG Scanning' },
+      { id: 'us10', name: 'OBG 3D/4D live scan', price: 2000, subcategory: 'OBG Scanning', commissionDay: 175, commissionNight: 175 },
       { id: 'us11', name: 'Routine obstetric', price: 1000, subcategory: 'OBG Scanning' },
       { id: 'us12', name: 'Obstetric Doppler', price: 1800, subcategory: 'OBG Scanning' },
-      { id: 'us13', name: 'Fetal biophysical profile', price: 1500, subcategory: 'OBG Scanning' },
+      { id: 'us13', name: 'Fetal biophysical profile (BBP)', price: 1800, subcategory: 'OBG Scanning', commissionDay: 175, commissionNight: 225 },
       { id: 'us14', name: 'USG Thyroid', price: 1000, subcategory: 'HRUS / Small Parts' },
       { id: 'us15', name: 'USG Neck', price: 1000, subcategory: 'HRUS / Small Parts' },
       { id: 'us16', name: 'USG Breast', price: 1200, subcategory: 'HRUS / Small Parts' },
@@ -248,10 +255,11 @@ export const DEFAULT_TEST_DATA: TestCategory[] = [
     category: 'DIGITAL X-RAY',
     isMajor: true,
     tests: [
-      { id: 'x1', name: 'Chest PA View', price: 400 },
+      { id: 'x1', name: 'Chest PA View', price: 550, commissionDay: 50, commissionNight: 75 },
       { id: 'x2', name: 'KUB X-Ray', price: 400 },
       { id: 'x3', name: 'Abdomen Erect', price: 400 },
-      { id: 'x4', name: 'Cervical Spine AP/Lat', price: 500 },
+      { id: 'x4', name: 'Cervical Spine AP/Lat', price: 550, commissionDay: 50, commissionNight: 100 },
+      { id: 'x13', name: 'Pelvis AP and Lateral', price: 550, commissionDay: 50, commissionNight: 125 },
       { id: 'x5', name: 'Skull AP/Lat', price: 500 },
       { id: 'x6', name: 'Barium meal follow through', price: 1500, subcategory: 'Procedures' },
       { id: 'x7', name: 'Hystero salpingography (HSG)', price: 1500, subcategory: 'Procedures' },
@@ -266,8 +274,8 @@ export const DEFAULT_TEST_DATA: TestCategory[] = [
     category: 'CARDIAC INVESTIGATION',
     isMajor: true,
     tests: [
-      { id: 'c1', name: 'ECG', price: 300 },
-      { id: 'c2', name: '2D - Echo', price: 2000 },
+      { id: 'c1', name: 'ECG', price: 250, commissionDay: 50, commissionNight: 75 },
+      { id: 'c2', name: '2D - Echo', price: 1200, commissionDay: 100, commissionNight: 125 },
     ]
   },
   {
@@ -289,7 +297,7 @@ export const DEFAULT_TEST_DATA: TestCategory[] = [
 export const DEFAULT_SETTINGS: AppSettings = {
     labName: 'SHIVASAI SCANNING, LAB & DIAGNOSTIC CENTER',
     labAddress: 'Jadhav Complex, Near Jadhav Hospital, BHALKI-585 328',
-    labContact: 'Ph: 08484-467549 | shivasai.scan@gmail.com',
+    labContact: 'Ph: 08484-467649 | shivasaiscanning@gmail.com',
     taxRate: 0.05,
     referringDoctors: REFERRING_DOCTORS,
     autoDeleteDays: 45, // 0 to disable

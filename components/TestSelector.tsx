@@ -75,8 +75,7 @@ const TreeItem: React.FC<{
     };
 
     // Group filtered tests by subcategory
-    // FIX: Explicitly type useMemo return value to avoid 'unknown' inference
-    const groupedItems = useMemo<{ noSub: Test[], subs: { [key: string]: Test[] } }>(() => {
+    const groupedItems = useMemo(() => {
         const noSub: Test[] = [];
         const subs: { [key: string]: Test[] } = {};
         
@@ -106,7 +105,9 @@ const TreeItem: React.FC<{
                     checked={isSelected}
                     onChange={() => handleTestToggle(test)}
                 />
-                <span className="ml-2 text-sm text-slate-600 select-none">{test.name}</span>
+                <span className="ml-2 text-sm text-slate-600 select-none">
+                    {test.name} <span className="text-slate-400 text-xs ml-1">(₹{test.price})</span>
+                </span>
             </label>
         );
     };
@@ -142,7 +143,7 @@ const TreeItem: React.FC<{
                     {groupedItems.noSub.map(renderTestItem)}
 
                     {/* Render Subcategories */}
-                    {Object.entries(groupedItems.subs).map(([subName, tests]) => (
+                    {Object.entries(groupedItems.subs).map(([subName, tests]: [string, Test[]]) => (
                         <div key={subName} className="mt-2">
                             <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 pl-2">{subName}</div>
                             {tests.map(renderTestItem)}
