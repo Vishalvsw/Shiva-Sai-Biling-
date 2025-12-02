@@ -458,7 +458,7 @@ const App: React.FC = () => {
                         logAction('BILL_VERIFIED', `Bill #${billNumberToVerify} was approved by ${currentUser.username}.`);
                         return { ...bill, verificationStatus: 'Verified', lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.username };
                     } else {
-                        logAction('BILL_REJECTED', `Bill #${billNumberToVerify} was rejected by ${currentUser.username}. Reason: ${reason}`);
+                        logAction('BILL_REJECTED', `Bill #${billNumberToVerify} was rejected by ${currentUser.username}. Reason: ${reason}.`);
                         return { ...bill, verificationStatus: 'Rejected', rejectionReason: reason, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.username };
                     }
                 }
