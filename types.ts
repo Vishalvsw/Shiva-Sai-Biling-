@@ -1,5 +1,4 @@
 
-
 // FIX: The content of this file was incorrect and contained the main App component.
 // It has been replaced with the correct type definitions.
 
