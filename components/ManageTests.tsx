@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { TestCategory, Test } from '../types';
 
@@ -39,9 +37,11 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
             const testIndex = newData[catIndex].tests.findIndex(t => t.id === originalTestId);
             if (testIndex !== -1) {
                 newData[catIndex].tests[testIndex] = updatedTest;
+                alert('Test updated successfully!');
             }
         } else { // Adding new test
             newData[catIndex].tests.push({ ...updatedTest, id: `custom-${Date.now()}` });
+            alert('Test added successfully!');
         }
         setTestData(newData);
         setEditingTest(null);
@@ -49,7 +49,8 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
     };
     
     const handleDeleteTest = (catIndex: number, testIndex: number) => {
-        if (window.confirm(`Are you sure you want to delete this test?`)) {
+        const testName = testData[catIndex].tests[testIndex].name;
+        if (window.confirm(`Are you sure you want to delete the test "${testName}"?`)) {
              const newData = [...testData];
             newData[catIndex].tests = newData[catIndex].tests.filter((_, i) => i !== testIndex);
             setTestData(newData);
