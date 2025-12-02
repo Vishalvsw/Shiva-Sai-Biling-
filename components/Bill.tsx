@@ -9,7 +9,7 @@ interface BillProps {
     testData: TestCategory[];
     patientDetails: PatientDetails;
     billNumber: number;
-    totalDiscount: number;
+    totalDiscount: number; // Now represents percentage
     paymentDetails: PaymentDetails;
     commissionRate: number;
     userRole: 'admin' | 'user';
@@ -20,8 +20,9 @@ interface BillProps {
     onRemoveItem: (testId: string) => void;
     onClearBill: () => void;
     onSaveBill: () => void;
+    onResetBill: () => void; // New prop for reset button
     onItemDiscountChange: (testId: string, discount: number) => void;
-    onTotalDiscountChange: (discount: number) => void;
+    onTotalDiscountChange: (discount: number) => void; // Now handles percentage
     onPaymentDetailsChange: (details: PaymentDetails) => void;
     onCommissionRateChange: (rate: number) => void;
 }
@@ -31,7 +32,7 @@ const Bill: React.FC<BillProps> = ({
     testData,
     patientDetails, 
     billNumber, 
-    totalDiscount,
+    totalDiscount, // Percentage
     paymentDetails,
     commissionRate,
     userRole,
@@ -42,6 +43,7 @@ const Bill: React.FC<BillProps> = ({
     onRemoveItem, 
     onClearBill,
     onSaveBill,
+    onResetBill, // Destructure new prop
     onItemDiscountChange,
     onTotalDiscountChange,
     onPaymentDetailsChange,
@@ -56,11 +58,15 @@ const Bill: React.FC<BillProps> = ({
     // Commission is for internal tracking and doesn't affect patient's total
     const commissionAmount = patientDetails.refdBy.trim() !== '' ? subtotalAfterItemDiscounts * (commissionRate / 100) : 0;
 
-    const cappedTotalDiscount = Math.max(0, Math.min(totalDiscount, subtotalAfterItemDiscounts));
-    const totalDiscountAmount = itemDiscounts + cappedTotalDiscount;
-    const taxableAmount = subtotal - totalDiscountAmount;
-    const tax = taxableAmount * settings.taxRate;
-    const total = taxableAmount + tax;
+    // Calculate bill-level discount based on percentage
+    const billDiscountAmount = subtotalAfterItemDiscounts * (totalDiscount / 100);
+    const totalDiscountAmount = itemDiscounts + billDiscountAmount; // Total discount is sum of item discounts and bill percentage discount
+    
+    const finalAmountBeforePayment = subtotal - totalDiscountAmount;
+    
+    // Tax removed as per request
+    const tax = 0; // Tax is always 0
+    const total = finalAmountBeforePayment + tax;
     const balanceDue = total - paymentDetails.amountPaid;
 
     const showPaymentMismatchWarning = !isViewingArchived && paymentDetails.amountPaid > total && total > 0;
@@ -126,6 +132,11 @@ const Bill: React.FC<BillProps> = ({
         if (window.confirm('Are you sure you want to start a new bill? All unsaved changes will be lost.')) {
             onClearBill();
         }
+    };
+    
+    // New handler for Reset button
+    const handleResetButtonClick = () => {
+        onResetBill();
     };
 
     const isSaveDisabled = items.length === 0 || patientDetails.name.trim() === '' || isViewingArchived;
@@ -297,22 +308,24 @@ const Bill: React.FC<BillProps> = ({
                     </div>
                     
                     <div className="flex justify-end items-center gap-4 print:hidden">
-                        <label htmlFor="totalDiscount" className="text-sm font-medium text-slate-500">Bill Discount:</label>
+                        <label htmlFor="totalDiscount" className="text-sm font-medium text-slate-500">Bill Discount (%):</label> {/* Label change */}
                         <div className="flex flex-col items-end">
                              <div className="relative">
-                                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">₹</span>
                                 <input
                                     type="number"
                                     id="totalDiscount"
                                     value={totalDiscount > 0 ? totalDiscount : ''}
                                     onChange={(e) => onTotalDiscountChange(parseFloat(e.target.value) || 0)}
-                                    placeholder="0.00"
-                                    className="w-28 rounded-md border-slate-300 py-1 pl-7 pr-2 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                    placeholder="0"
+                                    min="0"
+                                    max="100"
+                                    className="w-28 rounded-md border-slate-300 py-1 pr-7 pl-2 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                                 />
+                                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500">%</span> {/* Percentage symbol */}
                             </div>
                             {totalDiscount > 0 && (
                                 <p className="text-xs text-slate-500 mt-1">
-                                    Net: ₹{(taxableAmount).toFixed(2)}
+                                    Amount: ₹{billDiscountAmount.toFixed(2)}
                                 </p>
                             )}
                         </div>
@@ -326,14 +339,12 @@ const Bill: React.FC<BillProps> = ({
                     )}
                     
                     <div className="flex justify-end gap-4 print:text-sm">
-                        <span className="font-medium text-slate-500">Taxable Amount:</span>
-                        <span className="text-slate-900 w-28">₹{taxableAmount.toFixed(2)}</span>
+                        <span className="font-medium text-slate-500">Net Amount:</span> {/* Changed from Taxable Amount */}
+                        <span className="text-slate-900 w-28">₹{total.toFixed(2)}</span>
                     </div>
 
-                    <div className="flex justify-end gap-4 print:text-sm">
-                        <span className="font-medium text-slate-500">Tax ({settings.taxRate * 100}%):</span>
-                        <span className="text-slate-900 w-28">₹{tax.toFixed(2)}</span>
-                    </div>
+                    {/* Tax section removed */}
+                    
                     <div className="flex justify-end gap-4 border-t border-slate-200 pt-2 mt-2 print:border-t-2 print:border-black">
                         <span className="text-base font-bold text-slate-900">Grand Total:</span>
                         <span className="text-base font-bold text-slate-900 w-28">₹{total.toFixed(2)}</span>
@@ -401,6 +412,7 @@ const Bill: React.FC<BillProps> = ({
                 {/* Action Buttons */}
                 <div className="mt-8 flex justify-end gap-3 print:hidden">
                     <button onClick={handleNewBillClick} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200">New Bill</button>
+                    <button onClick={handleResetButtonClick} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200">Reset</button> {/* New Reset button */}
                     <button 
                         onClick={onSaveBill}
                         className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-lg hover:bg-green-700 disabled:bg-slate-300" 
@@ -459,7 +471,7 @@ const Bill: React.FC<BillProps> = ({
                         <tbody>
                             <tr><td>Subtotal:</td><td className="text-right">₹{subtotal.toFixed(2)}</td></tr>
                             {totalDiscountAmount > 0 && <tr><td>Discount:</td><td className="text-right">- ₹{totalDiscountAmount.toFixed(2)}</td></tr>}
-                            <tr><td>Tax ({settings.taxRate * 100}%):</td><td className="text-right">₹{tax.toFixed(2)}</td></tr>
+                            {/* Tax row removed from receipt */}
                             <tr className="font-bold border-t border-dashed border-black"><td className="pt-1">Grand Total:</td><td className="pt-1 text-right">₹{total.toFixed(2)}</td></tr>
                             <tr><td>Amount Paid:</td><td className="text-right">₹{paymentDetails.amountPaid.toFixed(2)}</td></tr>
                             <tr className="font-bold"><td className="pb-1">Balance Due:</td><td className="pb-1 text-right">₹{balanceDue.toFixed(2)}</td></tr>

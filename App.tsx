@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Test, PatientDetails, BillItem, PaymentDetails, User, SavedBill, AppSettings, TestCategory, AuditLogEntry } from './types';
 import { DEFAULT_TEST_DATA, DEFAULT_SETTINGS } from './constants';
@@ -67,6 +65,7 @@ const App: React.FC = () => {
 
      const [totalDiscount, setTotalDiscount] = useState<number>(() => {
         const saved = localStorage.getItem('totalDiscount');
+        // If tax was previously saved (old version), reset to 0
         return saved ? JSON.parse(saved) : 0;
     });
 
@@ -229,13 +228,29 @@ const App: React.FC = () => {
 
         setBillItems([]);
         setPatientDetails({ name: '', age: '', sex: '', refdBy: '' });
-        setTotalDiscount(0);
+        setTotalDiscount(0); // Reset total discount to 0%
         setPaymentDetails({ paymentMethod: '', amountPaid: 0 });
         setCommissionRate(0);
         setBillNumber(newBillNumber);
         setIsViewingArchived(false);
         setViewedBillDetails(null);
     }, [savedBills, billItems.length, billNumber, logAction]);
+
+    const handleResetCurrentBill = useCallback(() => {
+        if (window.confirm('Are you sure you want to reset the current bill? All unsaved data will be cleared.')) {
+            if (billItems.length > 0) {
+                logAction('BILL_RESET', `Reset current bill #${billNumber}.`);
+            }
+            setBillItems([]);
+            setPatientDetails({ name: '', age: '', sex: '', refdBy: '' });
+            setTotalDiscount(0); // Reset total discount to 0%
+            setPaymentDetails({ paymentMethod: '', amountPaid: 0 });
+            setCommissionRate(0);
+            setIsViewingArchived(false);
+            setViewedBillDetails(null);
+            // DO NOT change billNumber here
+        }
+    }, [billItems.length, billNumber, logAction]);
 
     const handleSaveBill = useCallback(() => {
         if (!currentUser || billItems.length === 0) return;
@@ -254,11 +269,16 @@ const App: React.FC = () => {
         // Calculations
         const subtotal = billItems.reduce((acc, item) => acc + item.price, 0);
         const itemDiscounts = billItems.reduce((acc, item) => acc + item.discount, 0);
-        const cappedTotalDiscount = Math.max(0, Math.min(totalDiscount, subtotal - itemDiscounts));
-        const totalDiscountAmount = itemDiscounts + cappedTotalDiscount;
-        const taxableAmount = subtotal - totalDiscountAmount;
-        const tax = taxableAmount * settings.taxRate;
-        const total = taxableAmount + tax;
+
+        const subtotalAfterItemDiscounts = subtotal - itemDiscounts;
+        const billDiscountAmount = subtotalAfterItemDiscounts * (totalDiscount / 100);
+        
+        const totalDiscountAmount = itemDiscounts + billDiscountAmount;
+        const finalAmountBeforePayment = subtotal - totalDiscountAmount;
+        
+        // Tax removed as per request. Set to 0.
+        const tax = 0; 
+        const total = finalAmountBeforePayment + tax;
         const balanceDue = total - paymentDetails.amountPaid;
 
         let paymentStatus: 'Paid' | 'Partial' | 'Unpaid';
@@ -277,11 +297,11 @@ const App: React.FC = () => {
             date: new Date().toISOString(),
             patientDetails,
             billItems,
-            totalDiscount,
+            totalDiscount, // Now a percentage
             paymentDetails,
             commissionRate,
             subtotal,
-            tax,
+            tax, // Always 0 now
             totalAmount: total,
             balanceDue,
             paymentStatus,
@@ -339,6 +359,11 @@ const App: React.FC = () => {
     }, [currentUser, logAction]);
 
     const handleViewArchivedBill = useCallback((bill: SavedBill) => {
+        if (currentUser?.role !== 'admin') {
+            alert("Admin permission required to view or modify this bill's details.");
+            return;
+        }
+
         setBillNumber(bill.billNumber);
         setPatientDetails(bill.patientDetails);
         setBillItems(bill.billItems);
@@ -349,7 +374,7 @@ const App: React.FC = () => {
         setViewedBillDetails(bill);
         setViewMode('billing');
         setAdminView('main');
-    }, []);
+    }, [currentUser]);
 
     const handleSetViewMode = (mode: 'billing' | 'history' | 'dashboard') => {
         setViewMode(mode);
@@ -392,6 +417,7 @@ const App: React.FC = () => {
                                 onRemoveItem={handleRemoveTest}
                                 onClearBill={handleClearBill}
                                 onSaveBill={handleSaveBill}
+                                onResetBill={handleResetCurrentBill}
                                 billNumber={billNumber}
                                 totalDiscount={totalDiscount}
                                 onTotalDiscountChange={(discount) => {

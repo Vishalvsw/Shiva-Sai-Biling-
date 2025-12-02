@@ -1,4 +1,5 @@
 
+
 // FIX: The content of this file was incorrect and contained the main App component.
 // It has been replaced with the correct type definitions.
 
@@ -25,7 +26,7 @@ export interface PatientDetails {
 }
 
 export interface BillItem extends Test {
-    discount: number;
+    discount: number; // Discount per item is still in absolute amount
 }
 
 export interface PaymentDetails {
@@ -43,11 +44,11 @@ export interface SavedBill {
     date: string; // ISO string
     patientDetails: PatientDetails;
     billItems: BillItem[];
-    totalDiscount: number;
+    totalDiscount: number; // This will now be a percentage for bill-level discount
     paymentDetails: PaymentDetails;
     commissionRate: number;
     subtotal: number;
-    tax: number;
+    tax: number; // Tax is removed from calculations, but kept in type for historical data, will be 0
     totalAmount: number;
     balanceDue: number;
     paymentStatus: 'Paid' | 'Partial' | 'Unpaid';
@@ -68,7 +69,7 @@ export interface AppSettings {
     labName: string;
     labAddress: string;
     labContact: string;
-    taxRate: number;
+    taxRate: number; // Tax is removed from calculations, but kept in type for potential future use or historical data context
     referringDoctors: string[];
     autoDeleteDays: number;
     verificationThreshold: number;

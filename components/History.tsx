@@ -82,6 +82,13 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, o
         return 'bg-gray-100 text-gray-800';
     }
 
+    const handleViewBillClick = (bill: SavedBill) => {
+        if (currentUser.role !== 'admin') {
+            alert("Admin permission required to view or modify this bill's details.");
+            return;
+        }
+        onViewBill(bill);
+    };
 
     return (
         <div className="bg-white p-6 rounded-xl shadow-lg space-y-4">
@@ -165,7 +172,7 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, o
                                             </>
                                         ) : (
                                             <>
-                                                <button onClick={() => onViewBill(bill)} className="text-orange-600 hover:text-orange-900 disabled:text-slate-400 disabled:cursor-not-allowed" disabled={bill.status === 'voided'}>
+                                                <button onClick={() => handleViewBillClick(bill)} className="text-orange-600 hover:text-orange-900 disabled:text-slate-400 disabled:cursor-not-allowed" disabled={bill.status === 'voided'}>
                                                     View
                                                 </button>
                                                 {currentUser.role === 'admin' && bill.status !== 'voided' && (
