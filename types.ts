@@ -46,7 +46,7 @@ export interface SavedBill {
     billItems: BillItem[];
     totalDiscount: number; // This will now be a percentage for bill-level discount
     paymentDetails: PaymentDetails;
-    commissionRate: number;
+    totalCommissionAmount: number; // Added to store calculated commission for a bill
     subtotal: number;
     tax: number; // Tax is removed from calculations, but kept in type for historical data, will be 0
     totalAmount: number;
@@ -63,6 +63,8 @@ export interface SavedBill {
     };
     billType: 'Standard' | 'Department';
     department?: string;
+    lastModifiedAt?: string; // Added for audit trail on modifications
+    lastModifiedBy?: string; // Added for audit trail on modifications
 }
 
 export interface AppSettings {

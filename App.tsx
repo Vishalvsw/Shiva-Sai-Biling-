@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Test, PatientDetails, BillItem, PaymentDetails, User, SavedBill, AppSettings, TestCategory, AuditLogEntry } from './types';
 import { DEFAULT_TEST_DATA, DEFAULT_SETTINGS } from './constants';
@@ -27,7 +28,9 @@ const App: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'billing' | 'history' | 'dashboard'>('billing');
     const [adminView, setAdminView] = useState<AdminView>('main');
-    const [isViewingArchived, setIsViewingArchived] = useState<boolean>(false);
+    
+    // Flag to indicate if an archived bill is currently loaded for viewing/editing
+    const [isEditingArchivedBill, setIsEditingArchivedBill] = useState<boolean>(false);
     const [viewedBillDetails, setViewedBillDetails] = useState<SavedBill | null>(null);
     
     // --- AUTHENTICATION STATE ---
@@ -74,10 +77,11 @@ const App: React.FC = () => {
         return saved ? JSON.parse(saved) : { paymentMethod: '', amountPaid: 0 };
     });
     
-    const [commissionRate, setCommissionRate] = useState<number>(() => {
-        const saved = localStorage.getItem('commissionRate');
-        return saved ? JSON.parse(saved) : 0;
-    });
+    // CommissionRate state removed - now calculated per-test if doctor is referred
+    // const [commissionRate, setCommissionRate] = useState<number>(() => {
+    //     const saved = localStorage.getItem('commissionRate');
+    //     return saved ? JSON.parse(saved) : 0;
+    // });
 
     const [billNumber, setBillNumber] = useState<number>(() => {
         const savedBillNumber = localStorage.getItem('currentBillNumber');
@@ -124,12 +128,12 @@ const App: React.FC = () => {
     useEffect(() => { localStorage.setItem('auditLog', JSON.stringify(auditLog)); }, [auditLog]);
 
     // Current bill persistence effects
-    useEffect(() => { if(viewMode !== 'billing') return; localStorage.setItem('patientDetails', JSON.stringify(patientDetails)); }, [patientDetails, viewMode]);
-    useEffect(() => { if(viewMode !== 'billing') return; localStorage.setItem('billItems', JSON.stringify(billItems)); }, [billItems, viewMode]);
-    useEffect(() => { if(viewMode !== 'billing') return; localStorage.setItem('totalDiscount', JSON.stringify(totalDiscount)); }, [totalDiscount, viewMode]);
-    useEffect(() => { if(viewMode !== 'billing') return; localStorage.setItem('paymentDetails', JSON.stringify(paymentDetails)); }, [paymentDetails, viewMode]);
-    useEffect(() => { if(viewMode !== 'billing') return; localStorage.setItem('commissionRate', JSON.stringify(commissionRate)); }, [commissionRate, viewMode]);
-    useEffect(() => { if(viewMode !== 'billing') return; localStorage.setItem('currentBillNumber', JSON.stringify(billNumber)); }, [billNumber, viewMode]);
+    useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('patientDetails', JSON.stringify(patientDetails)); }, [patientDetails, viewMode, isEditingArchivedBill]);
+    useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('billItems', JSON.stringify(billItems)); }, [billItems, viewMode, isEditingArchivedBill]);
+    useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('totalDiscount', JSON.stringify(totalDiscount)); }, [totalDiscount, viewMode, isEditingArchivedBill]);
+    useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('paymentDetails', JSON.stringify(paymentDetails)); }, [paymentDetails, viewMode, isEditingArchivedBill]);
+    // useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('commissionRate', JSON.stringify(commissionRate)); }, [commissionRate, viewMode, isEditingArchivedBill]); // Removed
+    useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('currentBillNumber', JSON.stringify(billNumber)); }, [billNumber, viewMode, isEditingArchivedBill]);
 
     // Auto-delete old bills effect
     useEffect(() => {
@@ -190,34 +194,41 @@ const App: React.FC = () => {
     };
 
     const handleAddTest = useCallback((test: Test) => {
-        setIsViewingArchived(false);
-        setViewedBillDetails(null);
+        // When adding a test, ensure we're not in archived view or clear it
+        if (isEditingArchivedBill) {
+            alert("Cannot add new tests when viewing an archived bill. Please use 'New Bill' to start fresh or 'Edit Bill' to modify the current one.");
+            return;
+        }
         setBillItems(prevItems => {
             if (prevItems.some(item => item.id === test.id)) {
                 return prevItems;
             }
             return [...prevItems, { ...test, discount: 0 }];
         });
-    }, []);
+    }, [isEditingArchivedBill]);
 
     const handleRemoveTest = useCallback((testId: string) => {
-        setIsViewingArchived(false);
-        setViewedBillDetails(null);
+        if (isEditingArchivedBill) {
+            alert("Cannot remove tests when viewing an archived bill. Please use 'New Bill' to start fresh or 'Edit Bill' to modify the current one.");
+            return;
+        }
         setBillItems(prevItems => prevItems.filter(item => item.id !== testId));
-    }, []);
+    }, [isEditingArchivedBill]);
     
     const handleItemDiscountChange = useCallback((testId: string, discountValue: number) => {
-        setIsViewingArchived(false);
-        setViewedBillDetails(null);
+        if (isEditingArchivedBill) {
+            alert("Cannot change discounts when viewing an archived bill. Please use 'New Bill' to start fresh or 'Edit Bill' to modify the current one.");
+            return;
+        }
         setBillItems(prevItems =>
             prevItems.map(item =>
                 item.id === testId ? { ...item, discount: discountValue } : item
             )
         );
-    }, []);
+    }, [isEditingArchivedBill]);
 
     const handleClearBill = useCallback(() => {
-        if (billItems.length > 0) {
+        if (billItems.length > 0 && !isEditingArchivedBill) { // Only log if it was an active bill
             logAction('BILL_CLEARED', `Cleared unsaved bill #${billNumber}.`);
         }
         
@@ -230,13 +241,18 @@ const App: React.FC = () => {
         setPatientDetails({ name: '', age: '', sex: '', refdBy: '' });
         setTotalDiscount(0); // Reset total discount to 0%
         setPaymentDetails({ paymentMethod: '', amountPaid: 0 });
-        setCommissionRate(0);
+        // setCommissionRate(0); // Removed
         setBillNumber(newBillNumber);
-        setIsViewingArchived(false);
+        setIsEditingArchivedBill(false); // Clear archived view state
         setViewedBillDetails(null);
-    }, [savedBills, billItems.length, billNumber, logAction]);
+    }, [savedBills, billItems.length, billNumber, logAction, isEditingArchivedBill]);
 
     const handleResetCurrentBill = useCallback(() => {
+        if (isEditingArchivedBill) {
+            alert("Cannot reset an archived bill. To start a new bill, click 'New Bill'.");
+            return;
+        }
+
         if (window.confirm('Are you sure you want to reset the current bill? All unsaved data will be cleared.')) {
             if (billItems.length > 0) {
                 logAction('BILL_RESET', `Reset current bill #${billNumber}.`);
@@ -245,15 +261,43 @@ const App: React.FC = () => {
             setPatientDetails({ name: '', age: '', sex: '', refdBy: '' });
             setTotalDiscount(0); // Reset total discount to 0%
             setPaymentDetails({ paymentMethod: '', amountPaid: 0 });
-            setCommissionRate(0);
-            setIsViewingArchived(false);
-            setViewedBillDetails(null);
+            // setCommissionRate(0); // Removed
             // DO NOT change billNumber here
         }
-    }, [billItems.length, billNumber, logAction]);
+    }, [billItems.length, billNumber, logAction, isEditingArchivedBill]);
+
+
+    const calculateBillTotals = useCallback((items: BillItem[], discountPercentage: number, referredBy: string) => {
+        const subtotal = items.reduce((acc, item) => acc + item.price, 0);
+        const itemDiscounts = items.reduce((acc, item) => acc + item.discount, 0);
+
+        const subtotalAfterItemDiscounts = subtotal - itemDiscounts;
+        const billDiscountAmount = subtotalAfterItemDiscounts * (discountPercentage / 100);
+        
+        const totalDiscountAmount = itemDiscounts + billDiscountAmount;
+        const finalAmountBeforePayment = subtotal - totalDiscountAmount;
+        
+        const tax = 0; 
+        const total = finalAmountBeforePayment + tax;
+
+        // Calculate total commission based on individual test commissions if a doctor is referred
+        let totalCommissionAmount = 0;
+        if (referredBy.trim() !== '') {
+            totalCommissionAmount = items.reduce((acc, item) => acc + (item.commissionDay || 0), 0);
+        }
+
+        // FIX: Add billDiscountAmount to the returned object.
+        return { subtotal, totalDiscountAmount, billDiscountAmount, total, totalCommissionAmount };
+    }, []);
+
 
     const handleSaveBill = useCallback(() => {
         if (!currentUser || billItems.length === 0) return;
+        if (isEditingArchivedBill) {
+            // This should not happen if the UI properly separates Save and Update actions
+            console.error("Attempted to Save new bill while editing an archived one. Use handleUpdateBill instead.");
+            return;
+        }
 
         // Determine Bill Type
         let billType: 'Standard' | 'Department' = 'Standard';
@@ -266,19 +310,7 @@ const App: React.FC = () => {
             department = categoryOfFirstItem.category;
         }
 
-        // Calculations
-        const subtotal = billItems.reduce((acc, item) => acc + item.price, 0);
-        const itemDiscounts = billItems.reduce((acc, item) => acc + item.discount, 0);
-
-        const subtotalAfterItemDiscounts = subtotal - itemDiscounts;
-        const billDiscountAmount = subtotalAfterItemDiscounts * (totalDiscount / 100);
-        
-        const totalDiscountAmount = itemDiscounts + billDiscountAmount;
-        const finalAmountBeforePayment = subtotal - totalDiscountAmount;
-        
-        // Tax removed as per request. Set to 0.
-        const tax = 0; 
-        const total = finalAmountBeforePayment + tax;
+        const { subtotal, totalDiscountAmount, total, totalCommissionAmount } = calculateBillTotals(billItems, totalDiscount, patientDetails.refdBy);
         const balanceDue = total - paymentDetails.amountPaid;
 
         let paymentStatus: 'Paid' | 'Partial' | 'Unpaid';
@@ -299,9 +331,9 @@ const App: React.FC = () => {
             billItems,
             totalDiscount, // Now a percentage
             paymentDetails,
-            commissionRate,
+            totalCommissionAmount, // Calculated based on items
             subtotal,
-            tax, // Always 0 now
+            tax: 0, // Always 0 now
             totalAmount: total,
             balanceDue,
             paymentStatus,
@@ -312,11 +344,72 @@ const App: React.FC = () => {
             department,
         };
         
-        logAction('BILL_SAVED', `Bill #${billNumber} saved for "${patientDetails.name}". Type: ${department || 'Standard'}. Total: ₹${total.toFixed(2)}, Paid: ₹${paymentDetails.amountPaid.toFixed(2)}.`);
+        logAction('BILL_SAVED', `Bill #${billNumber} saved for "${patientDetails.name}". Type: ${department || 'Standard'}. Total: ₹${total.toFixed(2)}, Paid: ₹${paymentDetails.amountPaid.toFixed(2)}. Commission: ₹${totalCommissionAmount.toFixed(2)}.`);
         setSavedBills(prev => [...prev, newSavedBill]);
         localStorage.setItem('lastBillNumber', billNumber.toString());
         handleClearBill();
-    }, [billItems, patientDetails, totalDiscount, paymentDetails, commissionRate, billNumber, handleClearBill, settings, logAction, currentUser, testData]);
+    }, [billItems, patientDetails, totalDiscount, paymentDetails, billNumber, handleClearBill, settings, logAction, currentUser, testData, calculateBillTotals, isEditingArchivedBill]);
+
+    const handleUpdateBill = useCallback(() => {
+        if (!currentUser || currentUser.role !== 'admin' || !isEditingArchivedBill || !viewedBillDetails) {
+            alert("Unauthorized or invalid attempt to update bill.");
+            return;
+        }
+
+        // Determine Bill Type
+        let billType: 'Standard' | 'Department' = 'Standard';
+        let department: string | undefined = undefined;
+
+        const firstItem = billItems[0];
+        const categoryOfFirstItem = testData.find(cat => cat.tests.some(t => t.id === firstItem.id));
+        if (categoryOfFirstItem?.isMajor) {
+            billType = 'Department';
+            department = categoryOfFirstItem.category;
+        }
+
+        const { subtotal, totalDiscountAmount, total, totalCommissionAmount } = calculateBillTotals(billItems, totalDiscount, patientDetails.refdBy);
+        const balanceDue = total - paymentDetails.amountPaid;
+
+        let paymentStatus: 'Paid' | 'Partial' | 'Unpaid';
+        if (paymentDetails.amountPaid <= 0 && total > 0) {
+            paymentStatus = 'Unpaid';
+        } else if (balanceDue > 0.01) {
+            paymentStatus = 'Partial';
+        } else {
+            paymentStatus = 'Paid';
+        }
+
+        const updatedBill: SavedBill = {
+            ...viewedBillDetails, // Keep original bill number, date, billedBy
+            patientDetails,
+            billItems,
+            totalDiscount,
+            paymentDetails,
+            totalCommissionAmount,
+            subtotal,
+            tax: 0,
+            totalAmount: total,
+            balanceDue,
+            paymentStatus,
+            verificationStatus: (total >= settings.verificationThreshold && viewedBillDetails.verificationStatus !== 'Rejected') ? 'Pending' : 'Verified', // Re-evaluate verification status if total changes
+            billType,
+            department,
+            lastModifiedAt: new Date().toISOString(),
+            lastModifiedBy: currentUser.username,
+        };
+
+        setSavedBills(prev => prev.map(bill => 
+            bill.billNumber === updatedBill.billNumber ? updatedBill : bill
+        ));
+        logAction('BILL_UPDATED', `Bill #${updatedBill.billNumber} was updated by ${currentUser.username}. Total: ₹${total.toFixed(2)}. Commission: ₹${totalCommissionAmount.toFixed(2)}.`);
+        
+        setIsEditingArchivedBill(false);
+        setViewedBillDetails(null);
+        handleClearBill(); // Clear current form after update
+        alert(`Bill #${updatedBill.billNumber} updated successfully!`);
+
+    }, [currentUser, isEditingArchivedBill, viewedBillDetails, billItems, patientDetails, totalDiscount, paymentDetails, testData, settings.verificationThreshold, calculateBillTotals, logAction, handleClearBill]);
+
 
     const handleVoidBill = useCallback((billNumberToVoid: number, reason: string) => {
         if (!currentUser) return;
@@ -331,12 +424,14 @@ const App: React.FC = () => {
                         voidedBy: currentUser.username,
                         voidedAt: new Date().toISOString(),
                         reason,
-                    }
+                    },
+                    lastModifiedAt: new Date().toISOString(),
+                    lastModifiedBy: currentUser.username,
                   }
                 : bill
             )
         );
-        logAction('BILL_VOIDED', `Bill #${billNumberToVoid} was voided. Reason: ${reason}`);
+        logAction('BILL_VOIDED', `Bill #${billNumberToVoid} was voided by ${currentUser.username}. Reason: ${reason}`);
     }, [currentUser, logAction]);
 
     const handleVerifyBill = useCallback((billNumberToVerify: number, isApproved: boolean, reason?: string) => {
@@ -346,11 +441,11 @@ const App: React.FC = () => {
             prevBills.map(bill => {
                 if (bill.billNumber === billNumberToVerify) {
                     if (isApproved) {
-                        logAction('BILL_VERIFIED', `Bill #${billNumberToVerify} was approved.`);
-                        return { ...bill, verificationStatus: 'Verified' };
+                        logAction('BILL_VERIFIED', `Bill #${billNumberToVerify} was approved by ${currentUser.username}.`);
+                        return { ...bill, verificationStatus: 'Verified', lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.username };
                     } else {
-                        logAction('BILL_REJECTED', `Bill #${billNumberToVerify} was rejected. Reason: ${reason}`);
-                        return { ...bill, verificationStatus: 'Rejected', rejectionReason: reason };
+                        logAction('BILL_REJECTED', `Bill #${billNumberToVerify} was rejected by ${currentUser.username}. Reason: ${reason}`);
+                        return { ...bill, verificationStatus: 'Rejected', rejectionReason: reason, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.username };
                     }
                 }
                 return bill;
@@ -363,18 +458,20 @@ const App: React.FC = () => {
             alert("Admin permission required to view or modify this bill's details.");
             return;
         }
-
-        setBillNumber(bill.billNumber);
+        
+        // Load the archived bill into the current billing state
+        setBillNumber(bill.billNumber); // Use original bill number
         setPatientDetails(bill.patientDetails);
-        setBillItems(bill.billItems);
+        setBillItems(bill.billItems.map(item => ({...item}))); // Deep copy items to allow modification without affecting original saved state
         setTotalDiscount(bill.totalDiscount);
         setPaymentDetails(bill.paymentDetails);
-        setCommissionRate(bill.commissionRate);
-        setIsViewingArchived(true);
-        setViewedBillDetails(bill);
+        // setCommissionRate(bill.commissionRate); // Removed
+        setIsEditingArchivedBill(true); // Set flag
+        setViewedBillDetails(bill); // Store original bill details
         setViewMode('billing');
         setAdminView('main');
-    }, [currentUser]);
+        logAction('VIEW_ARCHIVED_BILL', `Admin ${currentUser.username} viewed archived bill #${bill.billNumber}.`);
+    }, [currentUser, logAction]);
 
     const handleSetViewMode = (mode: 'billing' | 'history' | 'dashboard') => {
         setViewMode(mode);
@@ -402,6 +499,7 @@ const App: React.FC = () => {
                                 onAddTest={handleAddTest}
                                 onRemoveTest={handleRemoveTest}
                                 currentBillItems={billItems} 
+                                isDisabled={isEditingArchivedBill && currentUser.role !== 'admin'} // Disable selector for non-admins viewing archived
                             />
                         </div>
                         <div>
@@ -410,38 +508,40 @@ const App: React.FC = () => {
                                 testData={testData}
                                 patientDetails={patientDetails}
                                 onPatientDetailsChange={(details) => {
-                                    setIsViewingArchived(false);
-                                    setViewedBillDetails(null);
+                                    // setIsViewingArchived(false); // Removed, now managed by isEditingArchivedBill
+                                    // setViewedBillDetails(null); // Removed
                                     setPatientDetails(details);
                                 }}
                                 onRemoveItem={handleRemoveTest}
                                 onClearBill={handleClearBill}
                                 onSaveBill={handleSaveBill}
+                                onUpdateBill={handleUpdateBill} // Pass new update handler
                                 onResetBill={handleResetCurrentBill}
                                 billNumber={billNumber}
                                 totalDiscount={totalDiscount}
                                 onTotalDiscountChange={(discount) => {
-                                    setIsViewingArchived(false);
-                                    setViewedBillDetails(null);
+                                    // setIsViewingArchived(false); // Removed
+                                    // setViewedBillDetails(null); // Removed
                                     setTotalDiscount(discount);
                                 }}
                                 onItemDiscountChange={handleItemDiscountChange}
                                 paymentDetails={paymentDetails}
                                 onPaymentDetailsChange={(details) => {
-                                    setIsViewingArchived(false);
-                                    setViewedBillDetails(null);
+                                    // setIsViewingArchived(false); // Removed
+                                    // setViewedBillDetails(null); // Removed
                                     setPaymentDetails(details);
                                 }}
-                                commissionRate={commissionRate}
-                                onCommissionRateChange={(rate) => {
-                                    setIsViewingArchived(false);
-                                    setViewedBillDetails(null);
-                                    setCommissionRate(rate);
-                                }}
+                                // commissionRate={commissionRate} // Removed
+                                // onCommissionRateChange={(rate) => { // Removed
+                                //     // setIsViewingArchived(false);
+                                //     // setViewedBillDetails(null);
+                                //     // setCommissionRate(rate);
+                                // }}
                                 userRole={currentUser.role}
-                                isViewingArchived={isViewingArchived}
+                                isEditingArchivedBill={isEditingArchivedBill} // Pass flag
                                 viewedBillDetails={viewedBillDetails}
                                 settings={settings}
+                                calculateBillTotals={calculateBillTotals} // Pass calculation utility
                             />
                         </div>
                     </div>

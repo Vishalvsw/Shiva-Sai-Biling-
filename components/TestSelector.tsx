@@ -1,5 +1,4 @@
 
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { TestCategory, Test, BillItem } from '../types';
 
@@ -8,6 +7,7 @@ interface TestSelectorProps {
     onAddTest: (test: Test) => void;
     onRemoveTest: (testId: string) => void;
     currentBillItems: BillItem[];
+    isDisabled?: boolean; // New prop to disable interaction
 }
 
 const TreeItem: React.FC<{
@@ -85,8 +85,9 @@ const TreeItem: React.FC<{
         const subs: { [key: string]: Test[] } = {};
         
         filteredTests.forEach(test => {
+            // FIX: Correctly use test.subcategory as the key for the object.
             if (test.subcategory) {
-                if (!subs[test.subcategory]) subs[test.subcategory] = [];
+                if (!subs[test.subcategory]) subs[test.subcategory] = []; 
                 subs[test.subcategory].push(test);
             } else {
                 noSub.push(test);
@@ -105,15 +106,16 @@ const TreeItem: React.FC<{
     const renderTestItem = (test: Test) => {
         const isSelected = billItemIds.has(test.id);
         return (
-            <label key={test.id} className="flex items-center p-1.5 rounded-md hover:bg-orange-50 cursor-pointer ml-2">
+            <label key={test.id} className="flex items-center p-1.5 rounded-md hover:bg-orange-50 cursor-pointer ml-2" aria-label={`Select ${test.name}`}>
                 <input
                     type="checkbox"
                     className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
                     checked={isSelected}
                     onChange={() => handleTestToggle(test)}
+                    disabled={isDisabled}
                 />
                 <span className="ml-2 text-base text-slate-700 font-medium select-none"> {/* Updated text size and weight */}
-                    {test.name} <span className="text-slate-400 text-xs ml-1">(₹{test.price})</span>
+                    {test.name} <span className="text-slate-400 text-xs ml-1" aria-hidden="true">(₹{test.price})</span>
                 </span>
             </label>
         );
@@ -124,7 +126,10 @@ const TreeItem: React.FC<{
             <div
                 className={`flex items-center p-2 rounded-md cursor-pointer transition-colors ${isDisabled ? 'cursor-not-allowed bg-slate-100' : 'hover:bg-slate-100'}`}
                 onClick={() => !isDisabled && setIsOpen(!isOpen)}
-                title={isDisabled ? "Cannot mix tests from different major departments or with standard tests." : ""}
+                title={isDisabled ? "Cannot mix tests from different major departments or with standard tests, or bill is being viewed as archived." : ""}
+                role="button"
+                aria-expanded={isOpen}
+                aria-controls={`category-tests-${category.category.replace(/\s/g, '-')}`}
             >
                 <svg
                     className={`w-4 h-4 mr-2 flex-shrink-0 transform transition-transform ${isOpen ? 'rotate-90' : ''}`}
@@ -141,19 +146,20 @@ const TreeItem: React.FC<{
                     onClick={e => e.stopPropagation()}
                     disabled={isDisabled}
                     title={isDisabled ? "Category disabled" : `Select all ${category.tests.length} tests in this category`}
+                    aria-label={`Select all tests in ${category.category}`}
                 />
                 <span className={`ml-2 font-semibold select-none ${isDisabled ? 'text-slate-400' : 'text-slate-700'}`}>{category.category} ({selectedInCategoryCount}/{categoryTestIds.length})</span>
             </div>
             {isOpen && !isDisabled && (
-                <div className="pl-6 pt-1 space-y-1 border-l-2 border-slate-100 ml-4">
+                <div className="pl-6 pt-1 space-y-1 border-l-2 border-slate-100 ml-4" id={`category-tests-${category.category.replace(/\s/g, '-')}`}>
                     {/* Render Direct Tests */}
                     {groupedItems.noSub.map(renderTestItem)}
 
                     {/* Render Subcategories */}
-                    {Object.entries(groupedItems.subs).map(([subName, tests]) => (
+                    {Object.entries(groupedItems.subs).map(([subName, tests]: [string, Test[]]) => (
                         <div key={subName} className="mt-2">
                             <div className="text-sm font-semibold text-slate-600 mt-3 mb-1 pl-2 border-b border-slate-200 pb-1">{subName}</div> {/* Updated subcategory styling */}
-                            {(tests as Test[]).map(renderTestItem)}
+                            {tests.map(renderTestItem)}
                         </div>
                     ))}
                 </div>
@@ -163,7 +169,7 @@ const TreeItem: React.FC<{
 };
 
 
-const TestSelector: React.FC<TestSelectorProps> = ({ testData, onAddTest, onRemoveTest, currentBillItems }) => {
+const TestSelector: React.FC<TestSelectorProps> = ({ testData, onAddTest, onRemoveTest, currentBillItems, isDisabled = false }) => {
     const [searchTerm, setSearchTerm] = useState('');
 
     const activeBillCategoryInfo = useMemo(() => {
@@ -184,17 +190,19 @@ const TestSelector: React.FC<TestSelectorProps> = ({ testData, onAddTest, onRemo
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                aria-label="Search tests"
+                disabled={isDisabled}
             />
             <div className="space-y-1 overflow-y-auto pr-2 flex-grow">
                 {testData.map((category, index) => {
-                    let isDisabled = false;
-                    if (activeBillCategoryInfo) {
+                    let categoryIsDisabled = isDisabled;
+                    if (!categoryIsDisabled && activeBillCategoryInfo) {
                         if (activeBillCategoryInfo.isMajor) {
                             // If a major category item is selected, disable all other categories
-                            isDisabled = category.category !== activeBillCategoryInfo.name;
+                            categoryIsDisabled = category.category !== activeBillCategoryInfo.name;
                         } else {
                             // If a standard item is selected, disable all major categories
-                            isDisabled = !!category.isMajor;
+                            categoryIsDisabled = !!category.isMajor;
                         }
                     }
 
@@ -207,7 +215,7 @@ const TestSelector: React.FC<TestSelectorProps> = ({ testData, onAddTest, onRemo
                             currentBillItems={currentBillItems}
                             searchTerm={searchTerm}
                             isInitiallyOpen={index < 3 && !searchTerm} // Only initially open first 3 if no search
-                            isDisabled={isDisabled}
+                            isDisabled={categoryIsDisabled}
                         />
                     );
                 })}

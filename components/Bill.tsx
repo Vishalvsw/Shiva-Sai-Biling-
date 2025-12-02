@@ -1,8 +1,16 @@
 
-
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { BillItem, PatientDetails, PaymentDetails, AppSettings, SavedBill, TestCategory } from '../types';
 import Barcode from './Barcode';
+
+// Define a type for the calculateBillTotals function to be passed as a prop
+type CalculateBillTotalsFn = (items: BillItem[], discountPercentage: number, referredBy: string) => {
+    subtotal: number;
+    totalDiscountAmount: number;
+    billDiscountAmount: number; // FIX: Added to include the bill-level discount amount
+    total: number;
+    totalCommissionAmount: number;
+};
 
 interface BillProps {
     items: BillItem[];
@@ -11,20 +19,22 @@ interface BillProps {
     billNumber: number;
     totalDiscount: number; // Now represents percentage
     paymentDetails: PaymentDetails;
-    commissionRate: number;
+    // commissionRate: number; // Removed as per new commission logic
     userRole: 'admin' | 'user';
-    isViewingArchived: boolean;
+    isEditingArchivedBill: boolean; // Renamed from isViewingArchived
     viewedBillDetails: SavedBill | null;
     settings: AppSettings;
     onPatientDetailsChange: (details: PatientDetails) => void;
     onRemoveItem: (testId: string) => void;
     onClearBill: () => void;
     onSaveBill: () => void;
-    onResetBill: () => void; // New prop for reset button
+    onUpdateBill: () => void; // New prop for updating an existing bill
+    onResetBill: () => void; 
     onItemDiscountChange: (testId: string, discount: number) => void;
     onTotalDiscountChange: (discount: number) => void; // Now handles percentage
     onPaymentDetailsChange: (details: PaymentDetails) => void;
-    onCommissionRateChange: (rate: number) => void;
+    // onCommissionRateChange: (rate: number) => void; // Removed
+    calculateBillTotals: CalculateBillTotalsFn; // Passed from App.tsx
 }
 
 const Bill: React.FC<BillProps> = ({ 
@@ -34,45 +44,37 @@ const Bill: React.FC<BillProps> = ({
     billNumber, 
     totalDiscount, // Percentage
     paymentDetails,
-    commissionRate,
+    // commissionRate, // Removed
     userRole,
-    isViewingArchived,
+    isEditingArchivedBill,
     viewedBillDetails,
     settings,
     onPatientDetailsChange, 
-    onRemoveItem, 
+    onRemoveItem, // Destructure onRemoveItem
     onClearBill,
     onSaveBill,
-    onResetBill, // Destructure new prop
+    onUpdateBill, // Destructure new prop
+    onResetBill,
     onItemDiscountChange,
     onTotalDiscountChange,
     onPaymentDetailsChange,
-    onCommissionRateChange
+    // onCommissionRateChange // Removed
+    calculateBillTotals
 }) => {
+    // State to manage edit mode for archived bills
+    const [isEditModeActive, setIsEditModeActive] = useState(false);
 
-    const subtotal = items.reduce((acc, item) => acc + item.price, 0);
-    const itemDiscounts = items.reduce((acc, item) => acc + item.discount, 0);
+    // Recalculate totals using the passed utility function
+    const { subtotal, totalDiscountAmount, billDiscountAmount, total, totalCommissionAmount } = useMemo(() => { // FIX: Destructure billDiscountAmount
+        return calculateBillTotals(items, totalDiscount, patientDetails.refdBy);
+    }, [items, totalDiscount, patientDetails.refdBy, calculateBillTotals]);
 
-    const subtotalAfterItemDiscounts = subtotal - itemDiscounts;
-    
-    // Commission is for internal tracking and doesn't affect patient's total
-    const commissionAmount = patientDetails.refdBy.trim() !== '' ? subtotalAfterItemDiscounts * (commissionRate / 100) : 0;
-
-    // Calculate bill-level discount based on percentage
-    const billDiscountAmount = subtotalAfterItemDiscounts * (totalDiscount / 100);
-    const totalDiscountAmount = itemDiscounts + billDiscountAmount; // Total discount is sum of item discounts and bill percentage discount
-    
-    const finalAmountBeforePayment = subtotal - totalDiscountAmount;
-    
-    // Tax removed as per request
-    const tax = 0; // Tax is always 0
-    const total = finalAmountBeforePayment + tax;
     const balanceDue = total - paymentDetails.amountPaid;
 
-    const showPaymentMismatchWarning = !isViewingArchived && paymentDetails.amountPaid > total && total > 0;
+    const showPaymentMismatchWarning = !isEditingArchivedBill && paymentDetails.amountPaid > total && total > 0;
 
     const billTitle = useMemo(() => {
-        if (isViewingArchived) {
+        if (isEditingArchivedBill && viewedBillDetails) {
             return viewedBillDetails?.department ? `${viewedBillDetails.department} Bill` : 'Standard Lab Bill';
         }
         if (items.length > 0) {
@@ -83,12 +85,11 @@ const Bill: React.FC<BillProps> = ({
             }
         }
         return 'Standard Lab Bill';
-    }, [items, isViewingArchived, viewedBillDetails, testData]);
-
+    }, [items, isEditingArchivedBill, viewedBillDetails, testData]);
 
     // Automatically set amount paid to total if total is >= 5000 for a new bill
     useEffect(() => {
-        if (!isViewingArchived && total >= 5000) {
+        if (!isEditingArchivedBill && total >= settings.verificationThreshold) {
             // To avoid potential loops, only update if the value is not already correct
             if (paymentDetails.amountPaid !== total) {
                 onPaymentDetailsChange({
@@ -97,7 +98,15 @@ const Bill: React.FC<BillProps> = ({
                 });
             }
         }
-    }, [total, isViewingArchived, paymentDetails, onPaymentDetailsChange]);
+    }, [total, isEditingArchivedBill, paymentDetails, onPaymentDetailsChange, settings.verificationThreshold]);
+
+    // Reset edit mode when a new archived bill is loaded or when bill is cleared
+    useEffect(() => {
+        if (!isEditingArchivedBill) {
+            setIsEditModeActive(false);
+        }
+    }, [isEditingArchivedBill]);
+
 
     const handlePrint = () => {
         window.print();
@@ -134,18 +143,15 @@ const Bill: React.FC<BillProps> = ({
         }
     };
     
-    // New handler for Reset button
-    const handleResetButtonClick = () => {
-        onResetBill();
-    };
-
-    const isSaveDisabled = items.length === 0 || patientDetails.name.trim() === '' || isViewingArchived;
-    const isAmountPaidDisabled = total >= 5000 && !isViewingArchived;
+    // Determine if inputs should be disabled
+    const areInputsDisabled = isEditingArchivedBill && !isEditModeActive;
+    const isSaveDisabled = items.length === 0 || patientDetails.name.trim() === '';
+    const isAmountPaidDisabled = total >= settings.verificationThreshold && !isEditingArchivedBill;
 
     return (
         <>
             <div className="bg-white p-6 rounded-xl shadow-lg relative print:p-4 print:shadow-none print:border-none" id="bill-section">
-                {isViewingArchived && viewedBillDetails?.verificationStatus === 'Pending' && (
+                {isEditingArchivedBill && viewedBillDetails?.verificationStatus === 'Pending' && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none print:flex z-10">
                     <div className="text-6xl sm:text-8xl font-black text-red-500 text-opacity-20 transform -rotate-45 border-4 border-red-500 border-opacity-20 p-4 rounded-lg">
                       PROVISIONAL BILL
@@ -173,7 +179,16 @@ const Bill: React.FC<BillProps> = ({
                 {/* Patient Details Section */}
                 <div className="mb-6 border-b pb-6 print:border-none print:pb-0 print:mb-2">
                      <h2 className="text-2xl font-bold text-slate-800 sm:col-span-2 print:hidden mb-4">
-                        {isViewingArchived ? `Viewing Bill #${String(billNumber).padStart(6, '0')}` : billTitle}
+                        {isEditingArchivedBill ? `Viewing Bill #${String(billNumber).padStart(6, '0')}` : billTitle}
+                        {isEditingArchivedBill && userRole === 'admin' && (
+                            <button 
+                                onClick={() => setIsEditModeActive(!isEditModeActive)} 
+                                className={`ml-4 px-3 py-1 text-sm font-medium rounded-lg ${isEditModeActive ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'}`}
+                                aria-label={isEditModeActive ? "Exit edit mode" : "Enable edit mode for this bill"}
+                            >
+                                {isEditModeActive ? 'Exit Edit Mode' : 'Edit Bill'}
+                            </button>
+                        )}
                     </h2>
                      <div className="grid grid-cols-2 gap-4 mb-4 print:mb-2 print:text-sm">
                         <div>
@@ -187,15 +202,41 @@ const Bill: React.FC<BillProps> = ({
                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 print:hidden">
                         <div className="sm:col-span-4 md:col-span-2">
                             <label htmlFor="name" className="block text-sm font-medium text-slate-700">Patient Name</label>
-                            <input type="text" name="name" id="name" value={patientDetails.name} onChange={handleInputChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" />
+                            <input 
+                                type="text" 
+                                name="name" 
+                                id="name" 
+                                value={patientDetails.name} 
+                                onChange={handleInputChange} 
+                                className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" 
+                                disabled={areInputsDisabled}
+                                aria-label="Patient Name"
+                            />
                         </div>
                         <div>
                             <label htmlFor="age" className="block text-sm font-medium text-slate-700">Age</label>
-                            <input type="text" name="age" id="age" value={patientDetails.age} onChange={handleInputChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" />
+                            <input 
+                                type="text" 
+                                name="age" 
+                                id="age" 
+                                value={patientDetails.age} 
+                                onChange={handleInputChange} 
+                                className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" 
+                                disabled={areInputsDisabled}
+                                aria-label="Patient Age"
+                            />
                         </div>
                         <div>
                             <label htmlFor="sex" className="block text-sm font-medium text-slate-700">Sex</label>
-                            <select name="sex" id="sex" value={patientDetails.sex} onChange={handleInputChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            <select 
+                                name="sex" 
+                                id="sex" 
+                                value={patientDetails.sex} 
+                                onChange={handleInputChange} 
+                                className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                disabled={areInputsDisabled}
+                                aria-label="Patient Sex"
+                            >
                                 <option value="">Select</option>
                                 <option value="Male">Male</option>
                                 <option value="Female">Female</option>
@@ -209,7 +250,9 @@ const Bill: React.FC<BillProps> = ({
                                 id="refdBy" 
                                 value={patientDetails.refdBy} 
                                 onChange={handleInputChange} 
-                                className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                disabled={areInputsDisabled}
+                                aria-label="Referred by Doctor"
                             >
                                 <option value="">Select a Doctor</option>
                                 {settings.referringDoctors.map(doctor => (
@@ -217,34 +260,32 @@ const Bill: React.FC<BillProps> = ({
                                 ))}
                             </select>
                         </div>
-                        {userRole === 'admin' && (
+                        {/* Display commission amount if a doctor is referred and if it's not zero */}
+                        {patientDetails.refdBy.trim() !== '' && totalCommissionAmount > 0 && (
                             <div className="sm:col-span-4 md:col-span-2">
-                                <label htmlFor="commissionRate" className="block text-sm font-medium text-slate-700">Commission (%)</label>
-                                <input 
-                                    type="number" 
-                                    name="commissionRate" 
-                                    id="commissionRate" 
-                                    value={commissionRate > 0 ? commissionRate : ''}
-                                    onChange={(e) => onCommissionRateChange(parseFloat(e.target.value) || 0)}
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                                    placeholder="0"
-                                />
+                                <label className="block text-sm font-medium text-slate-700">Commission Amount</label>
+                                <p className="mt-1 block w-full text-sm text-slate-600">₹{totalCommissionAmount.toFixed(2)}</p>
                             </div>
                         )}
                     </div>
                      {/* Print View: Patient Details Text */}
                     <div className="hidden print:block border border-black p-3 my-4 text-sm">
                         <div className="grid grid-cols-2 gap-x-4">
+                            <p><strong className="font-semibold text-slate-800">Bill No:</strong> {String(billNumber).padStart(6, '0')}</p>
+                            <p><strong className="font-semibold text-slate-800">Date:</strong> {new Date().toLocaleDateString()}</p>
                             <p><strong className="font-semibold text-slate-800">Patient Name:</strong> {patientDetails.name}</p>
                             <p><strong className="font-semibold text-slate-800">Age / Sex:</strong> {patientDetails.age} / {patientDetails.sex}</p>
                             <p><strong className="font-semibold text-slate-800">Referred by Dr.:</strong> {patientDetails.refdBy || 'N/A'}</p>
+                            {patientDetails.refdBy.trim() !== '' && totalCommissionAmount > 0 && (
+                                <p><strong className="font-semibold text-slate-800">Commission:</strong> ₹{totalCommissionAmount.toFixed(2)}</p>
+                            )}
                         </div>
                     </div>
                 </div>
 
                 {/* Bill Items */}
                 <div className="flow-root print:mt-2">
-                    <table className="min-w-full divide-y divide-slate-300">
+                    <table className="min-w-full divide-y divide-slate-300" aria-label="Bill Items">
                         <thead className="bg-slate-50 print:bg-white print:border-y-2 print:border-black">
                             <tr>
                                 <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-slate-900 sm:pl-6 print:py-2 print:pl-0">Test Name</th>
@@ -277,7 +318,8 @@ const Bill: React.FC<BillProps> = ({
                                                     onItemDiscountChange(item.id, Math.max(0, Math.min(item.price, discount)));
                                                 }}
                                                 placeholder="0.00"
-                                                className="w-24 rounded-md border-slate-300 py-1 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                                className="w-24 rounded-md border-slate-300 py-1 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                                disabled={areInputsDisabled}
                                             />
                                             {item.discount > 0 && (
                                                 <p className="text-xs text-slate-500 mt-1">
@@ -288,7 +330,12 @@ const Bill: React.FC<BillProps> = ({
                                     </td>
                                      <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right print:py-1.5 print:pr-0">₹{(item.price - item.discount).toFixed(2)}</td>
                                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 print:hidden">
-                                        <button onClick={() => onRemoveItem(item.id)} className="text-red-600 hover:text-red-900">
+                                        <button 
+                                            onClick={() => onRemoveItem(item.id)} // FIX: Changed onItemRemove to onRemoveItem
+                                            className="text-red-600 hover:text-red-900 disabled:text-slate-400 disabled:cursor-not-allowed"
+                                            disabled={areInputsDisabled}
+                                            aria-label={`Remove ${item.name} from bill`}
+                                        >
                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                                             </svg>
@@ -319,13 +366,15 @@ const Bill: React.FC<BillProps> = ({
                                     placeholder="0"
                                     min="0"
                                     max="100"
-                                    className="w-28 rounded-md border-slate-300 py-1 pr-7 pl-2 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                    className="w-28 rounded-md border-slate-300 py-1 pr-7 pl-2 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                    disabled={areInputsDisabled}
+                                    aria-label="Bill Discount Percentage"
                                 />
                                 <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500">%</span> {/* Percentage symbol */}
                             </div>
                             {totalDiscount > 0 && (
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Amount: ₹{billDiscountAmount.toFixed(2)}
+                                <p className="text-xs text-slate-500 mt-1" aria-hidden="true">
+                                    Amount: ₹{billDiscountAmount.toFixed(2)} {/* FIX: Use billDiscountAmount here */}
                                 </p>
                             )}
                         </div>
@@ -356,7 +405,15 @@ const Bill: React.FC<BillProps> = ({
                         <div className="space-y-2 print:hidden">
                             <div className="flex justify-end items-center gap-4">
                                 <label htmlFor="paymentMethod" className="text-sm font-medium text-slate-500">Payment Method:</label>
-                                <select name="paymentMethod" id="paymentMethod" value={paymentDetails.paymentMethod} onChange={handlePaymentChange} className="w-28 rounded-md border-slate-300 py-1 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                <select 
+                                    name="paymentMethod" 
+                                    id="paymentMethod" 
+                                    value={paymentDetails.paymentMethod} 
+                                    onChange={handlePaymentChange} 
+                                    className="w-28 rounded-md border-slate-300 py-1 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                    disabled={areInputsDisabled}
+                                    aria-label="Payment Method"
+                                >
                                     <option value="">Select</option>
                                     <option value="Cash">Cash</option>
                                     <option value="Card">Card</option>
@@ -376,8 +433,9 @@ const Bill: React.FC<BillProps> = ({
                                         onChange={handlePaymentChange}
                                         placeholder="0.00"
                                         className="w-28 rounded-md border-slate-300 py-1 pl-7 pr-2 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
-                                        disabled={isAmountPaidDisabled}
-                                        title={isAmountPaidDisabled ? "Full payment is required for bills of ₹5000 or more." : "Enter amount paid by patient"}
+                                        disabled={isAmountPaidDisabled || areInputsDisabled}
+                                        title={isAmountPaidDisabled ? `Full payment is required for bills of ₹${settings.verificationThreshold} or more.` : "Enter amount paid by patient"}
+                                        aria-label="Amount Paid"
                                     />
                                 </div>
                             </div>
@@ -411,18 +469,68 @@ const Bill: React.FC<BillProps> = ({
 
                 {/* Action Buttons */}
                 <div className="mt-8 flex justify-end gap-3 print:hidden">
-                    <button onClick={handleNewBillClick} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200">New Bill</button>
-                    <button onClick={handleResetButtonClick} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200">Reset</button> {/* New Reset button */}
+                    {isEditingArchivedBill ? (
+                        <>
+                            <button 
+                                onClick={handleNewBillClick} 
+                                className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200"
+                                aria-label="Start a new bill"
+                            >
+                                New Bill
+                            </button>
+                            <button 
+                                onClick={onUpdateBill}
+                                className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-lg hover:bg-green-700 disabled:bg-slate-300" 
+                                disabled={isSaveDisabled || !isEditModeActive}
+                                title={isSaveDisabled ? "Add items and patient name to update" : (isEditModeActive ? "Update archived bill" : "Enable edit mode to update")}
+                                aria-label="Update current archived bill"
+                            >
+                                Update Bill
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button 
+                                onClick={handleNewBillClick} 
+                                className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200"
+                                aria-label="Start a new bill"
+                            >
+                                New Bill
+                            </button>
+                            <button 
+                                onClick={onResetBill} 
+                                className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200"
+                                aria-label="Reset current bill form"
+                            >
+                                Reset
+                            </button> 
+                            <button 
+                                onClick={onSaveBill}
+                                className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-lg hover:bg-green-700 disabled:bg-slate-300" 
+                                disabled={isSaveDisabled}
+                                title={isSaveDisabled ? "Add items and patient name to save" : "Save bill to history"}
+                                aria-label="Save current bill to history"
+                            >
+                                Save Bill
+                            </button>
+                        </>
+                    )}
                     <button 
-                        onClick={onSaveBill}
-                        className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-lg hover:bg-green-700 disabled:bg-slate-300" 
-                        disabled={isSaveDisabled}
-                        title={isSaveDisabled ? "Add items and patient name to save" : "Save bill to history"}
+                        onClick={handlePrint} 
+                        className="px-4 py-2 text-sm font-medium text-white bg-[#143A78] border border-transparent rounded-lg hover:bg-blue-800 disabled:bg-slate-300" 
+                        disabled={items.length === 0}
+                        aria-label="Print full bill"
                     >
-                        Save Bill
+                        Print Bill
                     </button>
-                    <button onClick={handlePrint} className="px-4 py-2 text-sm font-medium text-white bg-[#143A78] border border-transparent rounded-lg hover:bg-blue-800 disabled:bg-slate-300" disabled={items.length === 0}>Print Bill</button>
-                    <button onClick={handlePrintReceipt} className="px-4 py-2 text-sm font-medium text-white bg-gray-600 border border-transparent rounded-lg hover:bg-gray-700 disabled:bg-slate-300" disabled={items.length === 0}>Print Receipt</button>
+                    <button 
+                        onClick={handlePrintReceipt} 
+                        className="px-4 py-2 text-sm font-medium text-white bg-gray-600 border border-transparent rounded-lg hover:bg-gray-700 disabled:bg-slate-300" 
+                        disabled={items.length === 0}
+                        aria-label="Print receipt"
+                    >
+                        Print Receipt
+                    </button>
                 </div>
                 
                  <div className="hidden print:block mt-16 text-center">
@@ -445,6 +553,9 @@ const Bill: React.FC<BillProps> = ({
                     <p className="col-span-2">Patient: {patientDetails.name}</p>
                     <p>Age/Sex: {patientDetails.age}/{patientDetails.sex}</p>
                     <p>Refd By: {patientDetails.refdBy || 'N/A'}</p>
+                    {patientDetails.refdBy.trim() !== '' && totalCommissionAmount > 0 && (
+                        <p className="col-span-2">Commission: ₹{totalCommissionAmount.toFixed(2)}</p>
+                    )}
                 </div>
 
                 <div className="text-xs my-2">
