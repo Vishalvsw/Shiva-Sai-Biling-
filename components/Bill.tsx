@@ -7,7 +7,7 @@ import Barcode from './Barcode';
 type CalculateBillTotalsFn = (items: BillItem[], discountPercentage: number, referredBy: string) => {
     subtotal: number;
     totalDiscountAmount: number;
-    billDiscountAmount: number; // FIX: Added to include the bill-level discount amount
+    billDiscountAmount: number; 
     total: number;
     totalCommissionAmount: number;
 };
@@ -19,21 +19,19 @@ interface BillProps {
     billNumber: number;
     totalDiscount: number; // Now represents percentage
     paymentDetails: PaymentDetails;
-    // commissionRate: number; // Removed as per new commission logic
     userRole: 'admin' | 'user';
-    isEditingArchivedBill: boolean; // Renamed from isViewingArchived
+    isEditingArchivedBill: boolean; 
     viewedBillDetails: SavedBill | null;
     settings: AppSettings;
     onPatientDetailsChange: (details: PatientDetails) => void;
     onRemoveItem: (testId: string) => void;
     onClearBill: () => void;
     onSaveBill: () => void;
-    onUpdateBill: () => void; // New prop for updating an existing bill
+    onUpdateBill: () => void; 
     onResetBill: () => void; 
     onItemDiscountChange: (testId: string, discount: number) => void;
     onTotalDiscountChange: (discount: number) => void; // Now handles percentage
     onPaymentDetailsChange: (details: PaymentDetails) => void;
-    // onCommissionRateChange: (rate: number) => void; // Removed
     calculateBillTotals: CalculateBillTotalsFn; // Passed from App.tsx
 }
 
@@ -44,28 +42,26 @@ const Bill: React.FC<BillProps> = ({
     billNumber, 
     totalDiscount, // Percentage
     paymentDetails,
-    // commissionRate, // Removed
     userRole,
     isEditingArchivedBill,
     viewedBillDetails,
     settings,
     onPatientDetailsChange, 
-    onRemoveItem, // Destructure onRemoveItem
+    onRemoveItem, 
     onClearBill,
     onSaveBill,
-    onUpdateBill, // Destructure new prop
+    onUpdateBill, 
     onResetBill,
     onItemDiscountChange,
     onTotalDiscountChange,
     onPaymentDetailsChange,
-    // onCommissionRateChange // Removed
     calculateBillTotals
 }) => {
-    // State to manage edit mode for archived bills
+    // State to manage edit mode for archived bills (only for admins)
     const [isEditModeActive, setIsEditModeActive] = useState(false);
 
     // Recalculate totals using the passed utility function
-    const { subtotal, totalDiscountAmount, billDiscountAmount, total, totalCommissionAmount } = useMemo(() => { // FIX: Destructure billDiscountAmount
+    const { subtotal, totalDiscountAmount, billDiscountAmount, total, totalCommissionAmount } = useMemo(() => { 
         return calculateBillTotals(items, totalDiscount, patientDetails.refdBy);
     }, [items, totalDiscount, patientDetails.refdBy, calculateBillTotals]);
 
@@ -87,10 +83,10 @@ const Bill: React.FC<BillProps> = ({
         return 'Standard Lab Bill';
     }, [items, isEditingArchivedBill, viewedBillDetails, testData]);
 
-    // Automatically set amount paid to total if total is >= 5000 for a new bill
+    // Automatically set amount paid to total if total is >= verificationThreshold for a new bill
     useEffect(() => {
         if (!isEditingArchivedBill && total >= settings.verificationThreshold) {
-            // To avoid potential loops, only update if the value is not already correct
+            // Only update if the value is not already correct to avoid unnecessary re-renders
             if (paymentDetails.amountPaid !== total) {
                 onPaymentDetailsChange({
                     ...paymentDetails,
@@ -143,7 +139,7 @@ const Bill: React.FC<BillProps> = ({
         }
     };
     
-    // Determine if inputs should be disabled
+    // Determine if inputs should be disabled (viewing archived and not in admin edit mode)
     const areInputsDisabled = isEditingArchivedBill && !isEditModeActive;
     const isSaveDisabled = items.length === 0 || patientDetails.name.trim() === '';
     const isAmountPaidDisabled = total >= settings.verificationThreshold && !isEditingArchivedBill;
@@ -331,7 +327,7 @@ const Bill: React.FC<BillProps> = ({
                                      <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right print:py-1.5 print:pr-0">₹{(item.price - item.discount).toFixed(2)}</td>
                                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 print:hidden">
                                         <button 
-                                            onClick={() => onRemoveItem(item.id)} // FIX: Changed onItemRemove to onRemoveItem
+                                            onClick={() => onRemoveItem(item.id)} 
                                             className="text-red-600 hover:text-red-900 disabled:text-slate-400 disabled:cursor-not-allowed"
                                             disabled={areInputsDisabled}
                                             aria-label={`Remove ${item.name} from bill`}
@@ -355,7 +351,7 @@ const Bill: React.FC<BillProps> = ({
                     </div>
                     
                     <div className="flex justify-end items-center gap-4 print:hidden">
-                        <label htmlFor="totalDiscount" className="text-sm font-medium text-slate-500">Bill Discount (%):</label> {/* Label change */}
+                        <label htmlFor="totalDiscount" className="text-sm font-medium text-slate-500">Bill Discount (%):</label> 
                         <div className="flex flex-col items-end">
                              <div className="relative">
                                 <input
@@ -370,11 +366,11 @@ const Bill: React.FC<BillProps> = ({
                                     disabled={areInputsDisabled}
                                     aria-label="Bill Discount Percentage"
                                 />
-                                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500">%</span> {/* Percentage symbol */}
+                                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500">%</span> 
                             </div>
                             {totalDiscount > 0 && (
                                 <p className="text-xs text-slate-500 mt-1" aria-hidden="true">
-                                    Amount: ₹{billDiscountAmount.toFixed(2)} {/* FIX: Use billDiscountAmount here */}
+                                    Amount: ₹{billDiscountAmount.toFixed(2)} 
                                 </p>
                             )}
                         </div>
@@ -388,7 +384,7 @@ const Bill: React.FC<BillProps> = ({
                     )}
                     
                     <div className="flex justify-end gap-4 print:text-sm">
-                        <span className="font-medium text-slate-500">Net Amount:</span> {/* Changed from Taxable Amount */}
+                        <span className="font-medium text-slate-500">Net Amount:</span> 
                         <span className="text-slate-900 w-28">₹{total.toFixed(2)}</span>
                     </div>
 
@@ -478,6 +474,13 @@ const Bill: React.FC<BillProps> = ({
                             >
                                 New Bill
                             </button>
+                            <button 
+                                onClick={onResetBill} 
+                                className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200"
+                                aria-label="Reset current bill form"
+                            >
+                                Reset
+                            </button> 
                             <button 
                                 onClick={onUpdateBill}
                                 className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-lg hover:bg-green-700 disabled:bg-slate-300" 

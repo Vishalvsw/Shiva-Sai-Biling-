@@ -85,7 +85,6 @@ const TreeItem: React.FC<{
         const subs: { [key: string]: Test[] } = {};
         
         filteredTests.forEach(test => {
-            // FIX: Correctly use test.subcategory as the key for the object.
             if (test.subcategory) {
                 if (!subs[test.subcategory]) subs[test.subcategory] = []; 
                 subs[test.subcategory].push(test);

@@ -193,8 +193,8 @@ const App: React.FC = () => {
     };
 
     const handleAddTest = useCallback((test: Test) => {
-        // When adding a test, ensure we're not in archived view or clear it
-        if (isEditingArchivedBill) {
+        // Prevent adding new tests if an archived bill is loaded and user is not an admin
+        if (isEditingArchivedBill && currentUser?.role !== 'admin') {
             alert("Cannot add new tests when viewing an archived bill. Please use 'New Bill' to start fresh or 'Edit Bill' to modify the current one.");
             return;
         }
@@ -204,18 +204,20 @@ const App: React.FC = () => {
             }
             return [...prevItems, { ...test, discount: 0 }];
         });
-    }, [isEditingArchivedBill]);
+    }, [isEditingArchivedBill, currentUser]);
 
     const handleRemoveTest = useCallback((testId: string) => {
-        if (isEditingArchivedBill) {
+        // Prevent removing tests if an archived bill is loaded and user is not an admin
+        if (isEditingArchivedBill && currentUser?.role !== 'admin') {
             alert("Cannot remove tests when viewing an archived bill. Please use 'New Bill' to start fresh or 'Edit Bill' to modify the current one.");
             return;
         }
         setBillItems(prevItems => prevItems.filter(item => item.id !== testId));
-    }, [isEditingArchivedBill]);
+    }, [isEditingArchivedBill, currentUser]);
     
     const handleItemDiscountChange = useCallback((testId: string, discountValue: number) => {
-        if (isEditingArchivedBill) {
+        // Prevent changing discounts if an archived bill is loaded and user is not an admin
+        if (isEditingArchivedBill && currentUser?.role !== 'admin') {
             alert("Cannot change discounts when viewing an archived bill. Please use 'New Bill' to start fresh or 'Edit Bill' to modify the current one.");
             return;
         }
@@ -224,46 +226,49 @@ const App: React.FC = () => {
                 item.id === testId ? { ...item, discount: discountValue } : item
             )
         );
-    }, [isEditingArchivedBill]);
+    }, [isEditingArchivedBill, currentUser]);
 
     const handleClearBill = useCallback(() => {
-        if (billItems.length > 0 && !isEditingArchivedBill) { // Only log if it was an active bill
+        // Only log if it was an active bill (not just opening a new empty form)
+        if (billItems.length > 0 && !isEditingArchivedBill) { 
             logAction('BILL_CLEARED', `Cleared unsaved bill #${billNumber}.`);
         }
         
-        const newBillNumber = Math.max(
+        // Calculate the next available bill number
+        const lastExistingBillNumber = Math.max(
             parseInt(localStorage.getItem('lastBillNumber') || '0', 10),
             ...savedBills.map(b => b.billNumber)
-        ) + 1;
+        );
+        const newBillNumber = lastExistingBillNumber + 1;
 
         setBillItems([]);
         setPatientDetails({ name: '', age: '', sex: '', refdBy: '' });
         setTotalDiscount(0); // Reset total discount to 0%
         setPaymentDetails({ paymentMethod: '', amountPaid: 0 });
-        // setCommissionRate(0); // Removed
-        setBillNumber(newBillNumber);
+        setBillNumber(newBillNumber); // Increment bill number for a truly new bill
         setIsEditingArchivedBill(false); // Clear archived view state
         setViewedBillDetails(null);
     }, [savedBills, billItems.length, billNumber, logAction, isEditingArchivedBill]);
 
     const handleResetCurrentBill = useCallback(() => {
-        if (isEditingArchivedBill) {
-            alert("Cannot reset an archived bill. To start a new bill, click 'New Bill'.");
+        if (isEditingArchivedBill && currentUser?.role !== 'admin') {
+            alert("Only admins can reset an archived bill. To start a new bill, click 'New Bill'.");
             return;
         }
 
-        if (window.confirm('Are you sure you want to reset the current bill? All unsaved data will be cleared.')) {
-            if (billItems.length > 0) {
-                logAction('BILL_RESET', `Reset current bill #${billNumber}.`);
+        if (window.confirm('Are you sure you want to reset the current form? All unsaved data will be cleared.')) {
+            if (billItems.length > 0) { // Only log if it was an active bill
+                logAction('BILL_RESET_FORM', `Reset current bill form #${billNumber}.`);
             }
             setBillItems([]);
             setPatientDetails({ name: '', age: '', sex: '', refdBy: '' });
             setTotalDiscount(0); // Reset total discount to 0%
             setPaymentDetails({ paymentMethod: '', amountPaid: 0 });
-            // setCommissionRate(0); // Removed
-            // DO NOT change billNumber here
+            // Do NOT change billNumber here, it keeps the current bill number
+            setIsEditingArchivedBill(false); // Clear archived view state
+            setViewedBillDetails(null);
         }
-    }, [billItems.length, billNumber, logAction, isEditingArchivedBill]);
+    }, [billItems.length, billNumber, logAction, isEditingArchivedBill, currentUser]);
 
 
     const calculateBillTotals = useCallback((items: BillItem[], discountPercentage: number, referredBy: string) => {
@@ -285,7 +290,6 @@ const App: React.FC = () => {
             totalCommissionAmount = items.reduce((acc, item) => acc + (item.commissionDay || 0), 0);
         }
 
-        // FIX: Add billDiscountAmount to the returned object.
         return { subtotal, totalDiscountAmount, billDiscountAmount, total, totalCommissionAmount };
     }, []);
 
@@ -475,7 +479,6 @@ const App: React.FC = () => {
         setBillItems(bill.billItems.map(item => ({...item}))); // Deep copy items to allow modification without affecting original saved state
         setTotalDiscount(bill.totalDiscount);
         setPaymentDetails(bill.paymentDetails);
-        // setCommissionRate(bill.commissionRate); // Removed
         setIsEditingArchivedBill(true); // Set flag
         setViewedBillDetails(bill); // Store original bill details
         setViewMode('billing');
@@ -509,7 +512,8 @@ const App: React.FC = () => {
                                 onAddTest={handleAddTest}
                                 onRemoveTest={handleRemoveTest}
                                 currentBillItems={billItems} 
-                                isDisabled={isEditingArchivedBill && currentUser.role !== 'admin'} // Disable selector for non-admins viewing archived
+                                // Disable selector if an archived bill is loaded AND user is not admin
+                                isDisabled={isEditingArchivedBill && currentUser.role !== 'admin'} 
                             />
                         </div>
                         <div>
@@ -517,11 +521,7 @@ const App: React.FC = () => {
                                 items={billItems}
                                 testData={testData}
                                 patientDetails={patientDetails}
-                                onPatientDetailsChange={(details) => {
-                                    // setIsViewingArchived(false); // Removed, now managed by isEditingArchivedBill
-                                    // setViewedBillDetails(null); // Removed
-                                    setPatientDetails(details);
-                                }}
+                                onPatientDetailsChange={setPatientDetails}
                                 onRemoveItem={handleRemoveTest}
                                 onClearBill={handleClearBill}
                                 onSaveBill={handleSaveBill}
@@ -529,24 +529,10 @@ const App: React.FC = () => {
                                 onResetBill={handleResetCurrentBill}
                                 billNumber={billNumber}
                                 totalDiscount={totalDiscount}
-                                onTotalDiscountChange={(discount) => {
-                                    // setIsViewingArchived(false); // Removed
-                                    // setViewedBillDetails(null); // Removed
-                                    setTotalDiscount(discount);
-                                }}
+                                onTotalDiscountChange={setTotalDiscount}
                                 onItemDiscountChange={handleItemDiscountChange}
                                 paymentDetails={paymentDetails}
-                                onPaymentDetailsChange={(details) => {
-                                    // setIsViewingArchived(false); // Removed
-                                    // setViewedBillDetails(null); // Removed
-                                    setPaymentDetails(details);
-                                }}
-                                // commissionRate={commissionRate} // Removed
-                                // onCommissionRateChange={(rate) => { // Removed
-                                //     // setIsViewingArchived(false);
-                                //     // setViewedBillDetails(null);
-                                //     // setCommissionRate(rate);
-                                // }}
+                                onPaymentDetailsChange={setPaymentDetails}
                                 userRole={currentUser.role}
                                 isEditingArchivedBill={isEditingArchivedBill} // Pass flag
                                 viewedBillDetails={viewedBillDetails}
