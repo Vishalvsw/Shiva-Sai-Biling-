@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 
 // Make sure JsBarcode is loaded from the script tag in index.html
