@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Test, PatientDetails, BillItem, PaymentDetails, User, SavedBill, AppSettings, TestCategory, AuditLogEntry } from './types';
 import { DEFAULT_TEST_DATA, DEFAULT_SETTINGS } from './constants';
@@ -379,6 +378,17 @@ const App: React.FC = () => {
             paymentStatus = 'Paid';
         }
 
+        // Refined verification status logic
+        let newVerificationStatus: 'Verified' | 'Pending' | 'Rejected' = viewedBillDetails.verificationStatus;
+        if (newVerificationStatus !== 'Rejected') { // If it was already rejected, keep it rejected unless admin explicitly approves
+            if (total >= settings.verificationThreshold) {
+                newVerificationStatus = 'Pending';
+            } else {
+                newVerificationStatus = 'Verified';
+            }
+        }
+
+
         const updatedBill: SavedBill = {
             ...viewedBillDetails, // Keep original bill number, date, billedBy
             patientDetails,
@@ -391,7 +401,7 @@ const App: React.FC = () => {
             totalAmount: total,
             balanceDue,
             paymentStatus,
-            verificationStatus: (total >= settings.verificationThreshold && viewedBillDetails.verificationStatus !== 'Rejected') ? 'Pending' : 'Verified', // Re-evaluate verification status if total changes
+            verificationStatus: newVerificationStatus, 
             billType,
             department,
             lastModifiedAt: new Date().toISOString(),
@@ -401,7 +411,7 @@ const App: React.FC = () => {
         setSavedBills(prev => prev.map(bill => 
             bill.billNumber === updatedBill.billNumber ? updatedBill : bill
         ));
-        logAction('BILL_UPDATED', `Bill #${updatedBill.billNumber} was updated by ${currentUser.username}. Total: ₹${total.toFixed(2)}. Commission: ₹${totalCommissionAmount.toFixed(2)}.`);
+        logAction('BILL_UPDATED', `Bill #${updatedBill.billNumber} was updated by ${currentUser.username}. Total: ₹${total.toFixed(2)}. Commission: ₹${totalCommissionAmount.toFixed(2)}. Verification Status: ${newVerificationStatus}.`);
         
         setIsEditingArchivedBill(false);
         setViewedBillDetails(null);

@@ -83,8 +83,8 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, o
             outstandingCount: outstandingBills.length,
             voidedBillsCount: voidedBills.length,
             voidedBillsValue,
-            rejectedBillsCount: rejectedBills.length,
             rejectedBillsValue,
+            rejectedBillsCount: rejectedBills.length,
         };
     }, [activeBills, voidedBills, rejectedBills]);
 
@@ -98,12 +98,9 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, o
             }
             report[doctor].referrals++;
             
-            const itemDiscounts = bill.billItems.reduce((acc, item) => acc + item.discount, 0);
-            const subtotalAfterItemDiscounts = bill.subtotal - itemDiscounts;
-            const commissionAmount = bill.patientDetails.refdBy.trim() !== '' ? subtotalAfterItemDiscounts * (bill.commissionRate / 100) : 0;
-            
-            report[doctor].revenue += bill.totalAmount;
-            report[doctor].commission += commissionAmount;
+            // Use totalCommissionAmount from the saved bill directly
+            report[doctor].commission += bill.totalCommissionAmount;
+            report[doctor].revenue += bill.totalAmount; // This is the total amount, not just commission
         });
         return Object.entries(report).sort(([, a], [, b]) => b.revenue - a.revenue);
     }, [activeBills]);
