@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { TestCategory, Test, BillItem } from '../types';
 
@@ -44,12 +45,16 @@ const TreeItem: React.FC<{
         }
     }, [isSomeSelected]);
 
+    const categoryNameMatchesSearch = category.category.toLowerCase().includes(searchTerm.toLowerCase());
+    
     useEffect(() => {
-        // If searching, open categories that have matching tests
+        // If searching, open categories that have matching tests or category names
         if (searchTerm) {
-            setIsOpen(filteredTests.length > 0);
+            setIsOpen(categoryNameMatchesSearch || filteredTests.length > 0);
+        } else {
+            setIsOpen(isInitiallyOpen);
         }
-    }, [searchTerm, filteredTests.length]);
+    }, [searchTerm, filteredTests.length, categoryNameMatchesSearch, isInitiallyOpen]);
 
     const handleToggleAll = (e: React.ChangeEvent<HTMLInputElement>) => {
         e.stopPropagation();
@@ -91,7 +96,9 @@ const TreeItem: React.FC<{
     }, [filteredTests]);
 
 
-    if (searchTerm && filteredTests.length === 0) {
+    const shouldCategoryRender = !searchTerm || categoryNameMatchesSearch || filteredTests.length > 0;
+
+    if (!shouldCategoryRender) {
         return null;
     }
 
@@ -143,10 +150,10 @@ const TreeItem: React.FC<{
                     {groupedItems.noSub.map(renderTestItem)}
 
                     {/* Render Subcategories */}
-                    {Object.entries(groupedItems.subs).map(([subName, tests]: [string, Test[]]) => (
+                    {Object.entries(groupedItems.subs).map(([subName, tests]) => (
                         <div key={subName} className="mt-2">
                             <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 pl-2">{subName}</div>
-                            {tests.map(renderTestItem)}
+                            {(tests as Test[]).map(renderTestItem)}
                         </div>
                     ))}
                 </div>
@@ -173,7 +180,7 @@ const TestSelector: React.FC<TestSelectorProps> = ({ testData, onAddTest, onRemo
             <h2 className="text-2xl font-bold text-slate-800 border-b pb-2">Select Tests</h2>
             <input
                 type="text"
-                placeholder="Search for a test..."
+                placeholder="Search by test name, subcategory, or category..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -199,7 +206,7 @@ const TestSelector: React.FC<TestSelectorProps> = ({ testData, onAddTest, onRemo
                             onRemoveTest={onRemoveTest}
                             currentBillItems={currentBillItems}
                             searchTerm={searchTerm}
-                            isInitiallyOpen={index < 3 && !searchTerm}
+                            isInitiallyOpen={index < 3 && !searchTerm} // Only initially open first 3 if no search
                             isDisabled={isDisabled}
                         />
                     );
