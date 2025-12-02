@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useMemo, useState } from 'react';
 import { BillItem, PatientDetails, PaymentDetails, AppSettings, SavedBill, TestCategory } from '../types';
 import Barcode from './Barcode';
@@ -140,10 +139,26 @@ const Bill: React.FC<BillProps> = ({
         }
     };
     
-    // Determine if inputs should be disabled (viewing archived and not in admin edit mode)
+    // Determine if inputs should be disabled (viewing archived/saved bill and not in admin edit mode)
+    // If a bill is saved (isEditingArchivedBill is true), it is read-only by default.
     const areInputsDisabled = isEditingArchivedBill && !isEditModeActive;
+    
     const isSaveDisabled = items.length === 0 || patientDetails.name.trim() === '';
     const isAmountPaidDisabled = total >= settings.verificationThreshold && !isEditingArchivedBill;
+
+    // Helper to format test name
+    const getFormattedTestName = (item: BillItem) => {
+        const category = testData.find(cat => cat.tests.some(t => t.id === item.id));
+        const catName = category ? category.category.toUpperCase() : '';
+        const subName = item.subcategory ? item.subcategory.toUpperCase() : '';
+        const testName = item.name.toUpperCase();
+        
+        let formatted = catName;
+        if (subName) formatted += ` - ${subName}`;
+        formatted += ` - ${testName}`;
+        
+        return formatted;
+    };
 
     return (
         <>
@@ -302,7 +317,10 @@ const Bill: React.FC<BillProps> = ({
                             )}
                             {items.map((item) => (
                                 <tr key={item.id}>
-                                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-slate-900 sm:pl-6 print:py-1.5 print:pl-0">{item.name}</td>
+                                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-slate-900 sm:pl-6 print:py-1.5 print:pl-0">
+                                        {/* Use formatted test name */}
+                                        {getFormattedTestName(item)}
+                                    </td>
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right print:py-1.5">₹{item.price.toFixed(2)}</td>
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right print:hidden">
                                         <div className="flex flex-col items-end">
@@ -466,8 +484,10 @@ const Bill: React.FC<BillProps> = ({
 
                 {/* Action Buttons */}
                 <div className="mt-8 flex justify-end gap-3 print:hidden">
+                    {/* If editing an archived bill (which happens after save or when viewing history) */}
                     {isEditingArchivedBill ? (
                         <>
+                             {/* Only show these if viewing, not if creating new (which is checked via isEditingArchivedBill) */}
                             <button 
                                 onClick={handleNewBillClick} 
                                 className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200"
@@ -475,24 +495,35 @@ const Bill: React.FC<BillProps> = ({
                             >
                                 New Bill
                             </button>
-                            <button 
-                                onClick={onResetBill} 
-                                className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200"
-                                aria-label="Reset current bill form"
+                            
+                            {userRole === 'admin' && (
+                                <button 
+                                    onClick={onUpdateBill}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-lg hover:bg-green-700 disabled:bg-slate-300" 
+                                    disabled={isSaveDisabled || !isEditModeActive}
+                                    title={isEditModeActive ? "Update archived bill" : "Enable edit mode to update"}
+                                    aria-label="Update current archived bill"
+                                >
+                                    Update Bill
+                                </button>
+                            )}
+                             <button 
+                                onClick={handlePrint} 
+                                className="px-4 py-2 text-sm font-medium text-white bg-[#143A78] border border-transparent rounded-lg hover:bg-blue-800" 
+                                aria-label="Print full bill"
                             >
-                                Reset
-                            </button> 
+                                Print Bill
+                            </button>
                             <button 
-                                onClick={onUpdateBill}
-                                className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-lg hover:bg-green-700 disabled:bg-slate-300" 
-                                disabled={isSaveDisabled || !isEditModeActive}
-                                title={isSaveDisabled ? "Add items and patient name to update" : (isEditModeActive ? "Update archived bill" : "Enable edit mode to update")}
-                                aria-label="Update current archived bill"
+                                onClick={handlePrintReceipt} 
+                                className="px-4 py-2 text-sm font-medium text-white bg-gray-600 border border-transparent rounded-lg hover:bg-gray-700" 
+                                aria-label="Print receipt"
                             >
-                                Update Bill
+                                Print Receipt
                             </button>
                         </>
                     ) : (
+                        // If creating a NEW bill
                         <>
                             <button 
                                 onClick={handleNewBillClick} 
@@ -519,22 +550,6 @@ const Bill: React.FC<BillProps> = ({
                             </button>
                         </>
                     )}
-                    <button 
-                        onClick={handlePrint} 
-                        className="px-4 py-2 text-sm font-medium text-white bg-[#143A78] border border-transparent rounded-lg hover:bg-blue-800 disabled:bg-slate-300" 
-                        disabled={items.length === 0}
-                        aria-label="Print full bill"
-                    >
-                        Print Bill
-                    </button>
-                    <button 
-                        onClick={handlePrintReceipt} 
-                        className="px-4 py-2 text-sm font-medium text-white bg-gray-600 border border-transparent rounded-lg hover:bg-gray-700 disabled:bg-slate-300" 
-                        disabled={items.length === 0}
-                        aria-label="Print receipt"
-                    >
-                        Print Receipt
-                    </button>
                 </div>
                 
                  <div className="hidden print:block mt-16 text-center">
@@ -573,7 +588,7 @@ const Bill: React.FC<BillProps> = ({
                         <tbody>
                             {items.map(item => (
                                 <tr key={item.id}>
-                                    <td className="py-0.5">{item.name}</td>
+                                    <td className="py-0.5">{getFormattedTestName(item)}</td>
                                     <td className="text-right py-0.5">{(item.price - item.discount).toFixed(2)}</td>
                                 </tr>
                             ))}

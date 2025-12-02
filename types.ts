@@ -1,7 +1,4 @@
 
-// FIX: The content of this file was incorrect and contained the main App component.
-// It has been replaced with the correct type definitions.
-
 export interface Test {
     id: string;
     name: string;
@@ -59,6 +56,12 @@ export interface SavedBill {
         voidedBy: string;
         voidedAt: string; // ISO string
         reason: string;
+    };
+    cancellationRequest?: {
+        requestedBy: string;
+        requestedAt: string;
+        reason: string;
+        status: 'pending' | 'approved' | 'rejected';
     };
     billType: 'Standard' | 'Department';
     department?: string;

@@ -1,5 +1,4 @@
 
-
 import React, { useState, useMemo } from 'react';
 import { SavedBill, User } from '../types';
 
@@ -7,11 +6,12 @@ interface HistoryProps {
     savedBills: SavedBill[];
     onViewBill: (bill: SavedBill) => void;
     onVoidBill: (billNumber: number, reason: string) => void;
+    onRequestCancellation: (billNumber: number, reason: string) => void;
     onVerifyBill: (billNumber: number, isApproved: boolean, reason?: string) => void;
     currentUser: User;
 }
 
-const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, onVerifyBill, currentUser }) => {
+const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, onRequestCancellation, onVerifyBill, currentUser }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showVoided, setShowVoided] = useState(false);
 
@@ -25,6 +25,15 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, o
             onVoidBill(bill.billNumber, reason.trim());
         } else if (reason !== null) { // User didn't click cancel
             alert('A reason is required to void a bill.');
+        }
+    };
+    
+    const handleRequestCancelClick = (bill: SavedBill) => {
+        const reason = prompt(`Please provide a reason for cancelling Bill #${String(bill.billNumber).padStart(6, '0')}:`);
+        if (reason && reason.trim()) {
+            onRequestCancellation(bill.billNumber, reason.trim());
+        } else if (reason !== null) {
+            alert('A reason is required to request cancellation.');
         }
     };
 
@@ -83,10 +92,7 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, o
     }
 
     const handleViewBillClick = (bill: SavedBill) => {
-        if (currentUser.role !== 'admin') {
-            alert("Admin permission required to view or modify this bill's details.");
-            return;
-        }
+        // Now allows all users to view
         onViewBill(bill);
     };
 
@@ -175,10 +181,24 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, o
                                                 <button onClick={() => handleViewBillClick(bill)} className="text-orange-600 hover:text-orange-900 disabled:text-slate-400 disabled:cursor-not-allowed" disabled={bill.status === 'voided'}>
                                                     View
                                                 </button>
+                                                
+                                                {/* Admin Actions */}
                                                 {currentUser.role === 'admin' && bill.status !== 'voided' && (
-                                                    <button onClick={() => handleVoidClick(bill)} className="text-red-600 hover:text-red-900">
+                                                    <button onClick={() => handleVoidClick(bill)} className="text-red-600 hover:text-red-900 ml-2">
                                                         Void
                                                     </button>
+                                                )}
+                                                
+                                                {/* User Actions - Request Cancellation */}
+                                                {currentUser.role !== 'admin' && bill.status !== 'voided' && !bill.cancellationRequest && (
+                                                    <button onClick={() => handleRequestCancelClick(bill)} className="text-red-500 hover:text-red-700 ml-2">
+                                                        Req. Cancel
+                                                    </button>
+                                                )}
+                                                
+                                                {/* Pending Cancel Status */}
+                                                {bill.cancellationRequest?.status === 'pending' && (
+                                                    <span className="text-xs text-orange-600 font-semibold ml-2 block sm:inline">Cancel Requested</span>
                                                 )}
                                             </>
                                         )}

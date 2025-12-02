@@ -77,12 +77,6 @@ const App: React.FC = () => {
         return saved ? JSON.parse(saved) : { paymentMethod: '', amountPaid: 0 };
     });
     
-    // CommissionRate state removed - now calculated per-test if doctor is referred
-    // const [commissionRate, setCommissionRate] = useState<number>(() => {
-    //     const saved = localStorage.getItem('commissionRate');
-    //     return saved ? JSON.parse(saved) : 0;
-    // });
-
     const [billNumber, setBillNumber] = useState<number>(() => {
         const savedBillNumber = localStorage.getItem('currentBillNumber');
         const savedItems = localStorage.getItem('billItems');
@@ -132,7 +126,6 @@ const App: React.FC = () => {
     useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('billItems', JSON.stringify(billItems)); }, [billItems, viewMode, isEditingArchivedBill]);
     useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('totalDiscount', JSON.stringify(totalDiscount)); }, [totalDiscount, viewMode, isEditingArchivedBill]);
     useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('paymentDetails', JSON.stringify(paymentDetails)); }, [paymentDetails, viewMode, isEditingArchivedBill]);
-    // useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('commissionRate', JSON.stringify(commissionRate)); }, [commissionRate, viewMode, isEditingArchivedBill]); // Removed
     useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('currentBillNumber', JSON.stringify(billNumber)); }, [billNumber, viewMode, isEditingArchivedBill]);
 
     // Auto-delete old bills effect
@@ -298,7 +291,6 @@ const App: React.FC = () => {
     const handleSaveBill = useCallback(() => {
         if (!currentUser || billItems.length === 0) return;
         if (isEditingArchivedBill) {
-            // This should not happen if the UI properly separates Save and Update actions
             console.error("Attempted to Save new bill while editing an archived one. Use handleUpdateBill instead.");
             return;
         }
@@ -351,8 +343,12 @@ const App: React.FC = () => {
         logAction('BILL_SAVED', `Bill #${billNumber} saved for "${patientDetails.name}". Type: ${department || 'Standard'}. Total: ₹${total.toFixed(2)}, Paid: ₹${paymentDetails.amountPaid.toFixed(2)}. Commission: ₹${totalCommissionAmount.toFixed(2)}.`);
         setSavedBills(prev => [...prev, newSavedBill]);
         localStorage.setItem('lastBillNumber', billNumber.toString());
-        handleClearBill();
-    }, [billItems, patientDetails, totalDiscount, paymentDetails, billNumber, handleClearBill, settings, logAction, currentUser, testData, calculateBillTotals, isEditingArchivedBill]);
+        
+        // Instead of clearing the bill, we enter "view mode" for the saved bill so buttons can be shown.
+        // We set the details to the bill we just saved.
+        setViewedBillDetails(newSavedBill);
+        setIsEditingArchivedBill(true); 
+    }, [billItems, patientDetails, totalDiscount, paymentDetails, billNumber, settings, logAction, currentUser, testData, calculateBillTotals, isEditingArchivedBill]);
 
     const handleUpdateBill = useCallback(() => {
         if (!currentUser || currentUser.role !== 'admin' || !isEditingArchivedBill || !viewedBillDetails) {
@@ -448,6 +444,26 @@ const App: React.FC = () => {
         );
         logAction('BILL_VOIDED', `Bill #${billNumberToVoid} was voided by ${currentUser.username}. Reason: ${reason}`);
     }, [currentUser, logAction]);
+    
+    const handleRequestCancellation = useCallback((billNumberToCancel: number, reason: string) => {
+        if (!currentUser) return;
+        setSavedBills(prevBills => 
+            prevBills.map(bill => 
+                bill.billNumber === billNumberToCancel 
+                ? { 
+                    ...bill, 
+                    cancellationRequest: {
+                        requestedBy: currentUser.username,
+                        requestedAt: new Date().toISOString(),
+                        reason,
+                        status: 'pending'
+                    }
+                  }
+                : bill
+            )
+        );
+        logAction('CANCELLATION_REQUESTED', `Cancellation requested for Bill #${billNumberToCancel} by ${currentUser.username}. Reason: ${reason}`);
+    }, [currentUser, logAction]);
 
     const handleVerifyBill = useCallback((billNumberToVerify: number, isApproved: boolean, reason?: string) => {
         if (!currentUser || currentUser.role !== 'admin') return;
@@ -469,22 +485,19 @@ const App: React.FC = () => {
     }, [currentUser, logAction]);
 
     const handleViewArchivedBill = useCallback((bill: SavedBill) => {
-        if (currentUser?.role !== 'admin') {
-            alert("Admin permission required to view or modify this bill's details.");
-            return;
-        }
+        // ALLOW ALL USERS TO VIEW
         
         // Load the archived bill into the current billing state
         setBillNumber(bill.billNumber); // Use original bill number
         setPatientDetails(bill.patientDetails);
-        setBillItems(bill.billItems.map(item => ({...item}))); // Deep copy items to allow modification without affecting original saved state
+        setBillItems(bill.billItems.map(item => ({...item}))); // Deep copy items
         setTotalDiscount(bill.totalDiscount);
         setPaymentDetails(bill.paymentDetails);
         setIsEditingArchivedBill(true); // Set flag
         setViewedBillDetails(bill); // Store original bill details
         setViewMode('billing');
         setAdminView('main');
-        logAction('VIEW_ARCHIVED_BILL', `Admin ${currentUser.username} viewed archived bill #${bill.billNumber}.`);
+        logAction('VIEW_ARCHIVED_BILL', `${currentUser?.username} viewed archived bill #${bill.billNumber}.`);
     }, [currentUser, logAction]);
 
     const handleSetViewMode = (mode: 'billing' | 'history' | 'dashboard') => {
@@ -544,7 +557,7 @@ const App: React.FC = () => {
                     </div>
                 );
             case 'history':
-                return <History savedBills={savedBills} onViewBill={handleViewArchivedBill} onVoidBill={handleVoidBill} onVerifyBill={handleVerifyBill} currentUser={currentUser} />;
+                return <History savedBills={savedBills} onViewBill={handleViewArchivedBill} onVoidBill={handleVoidBill} onRequestCancellation={handleRequestCancellation} onVerifyBill={handleVerifyBill} currentUser={currentUser} />;
             case 'dashboard':
                 if (currentUser.role === 'admin') {
                     switch(adminView) {
