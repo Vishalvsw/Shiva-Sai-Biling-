@@ -1,5 +1,5 @@
 {
-  "name": "Offline Medical Lab Billing System",
+  "name": "Shiva Sai  Medical Lab Billing System",
   "description": "An offline billing application for a medical diagnostic lab. Users can select tests, enter patient details, and generate a printable bill. All data is saved locally in the browser.",
   "requestFramePermissions": []
 }
