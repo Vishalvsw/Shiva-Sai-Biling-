@@ -9,10 +9,22 @@ interface HistoryProps {
     onRequestCancellation: (billNumber: number, reason: string) => void;
     onRequestModification: (billNumber: number, reason: string) => void;
     onVerifyBill: (billNumber: number, isApproved: boolean, reason?: string) => void;
+    onProcessCancellation: (billNumber: number, action: 'approve' | 'reject') => void;
+    onProcessModification: (billNumber: number, action: 'approve' | 'reject') => void;
     currentUser: User;
 }
 
-const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, onRequestCancellation, onRequestModification, onVerifyBill, currentUser }) => {
+const History: React.FC<HistoryProps> = ({ 
+    savedBills, 
+    onViewBill, 
+    onVoidBill, 
+    onRequestCancellation, 
+    onRequestModification, 
+    onVerifyBill, 
+    onProcessCancellation,
+    onProcessModification,
+    currentUser 
+}) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showVoided, setShowVoided] = useState(false);
 
@@ -102,8 +114,12 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, o
     }
 
     const handleViewBillClick = (bill: SavedBill) => {
-        // Now allows all users to view
         onViewBill(bill);
+    };
+
+    const handleModifyApprove = (bill: SavedBill) => {
+        onProcessModification(bill.billNumber, 'approve');
+        onViewBill(bill); // Immediately open for editing
     };
 
     return (
@@ -148,7 +164,7 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, o
                             )}
                             <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">Total</th>
                             <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-slate-900">Payment</th>
-                            <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-slate-900">Verification</th>
+                            <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-slate-900">Req. Status</th>
                             <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6 text-right">
                                 <span className="sr-only">Actions</span>
                             </th>
@@ -157,7 +173,7 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, o
                     <tbody className="divide-y divide-slate-200 bg-white">
                         {filteredBills.length === 0 ? (
                             <tr>
-                                <td colSpan={currentUser.role === 'admin' ? 11 : 10} className="text-center py-10 text-slate-500 italic">
+                                <td colSpan={currentUser.role === 'admin' ? 12 : 11} className="text-center py-10 text-slate-500 italic">
                                     {savedBills.length === 0 ? 'No bills have been saved yet.' : 'No matching bills found.'}
                                 </td>
                             </tr>
@@ -186,11 +202,34 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, o
                                         </span>
                                     </td>
                                      <td className="whitespace-nowrap px-3 py-4 text-sm text-center">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getVerificationStatusBadge(bill.verificationStatus)}`} title={bill.rejectionReason}>
-                                            {bill.verificationStatus}
-                                        </span>
+                                        {/* Status for Cancellation Requests */}
+                                        {bill.cancellationRequest && (
+                                            <div title={`Cancel: ${bill.cancellationRequest.reason}`} className="mb-1">
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                                    bill.cancellationRequest.status === 'pending' ? 'bg-red-100 text-red-800' :
+                                                    bill.cancellationRequest.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                                    'bg-gray-100 text-gray-800'
+                                                }`}>
+                                                    Cancel: {bill.cancellationRequest.status}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {/* Status for Modification Requests */}
+                                        {bill.modificationRequest && (
+                                            <div title={`Modify: ${bill.modificationRequest.reason}`}>
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                                    bill.modificationRequest.status === 'pending' ? 'bg-blue-100 text-blue-800' :
+                                                    bill.modificationRequest.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                                    bill.modificationRequest.status === 'resolved' ? 'bg-green-100 text-green-800' :
+                                                    'bg-gray-100 text-gray-800'
+                                                }`}>
+                                                    Mod: {bill.modificationRequest.status}
+                                                </span>
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 space-x-2">
+                                        {/* Verification Controls for Admin */}
                                         {currentUser.role === 'admin' && bill.verificationStatus === 'Pending' ? (
                                             <>
                                                 <button onClick={() => onVerifyBill(bill.billNumber, true)} className="text-green-600 hover:text-green-900">Approve</button>
@@ -202,35 +241,41 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, o
                                                     View
                                                 </button>
                                                 
-                                                {/* Admin Actions */}
+                                                {/* Admin Actions: Void */}
                                                 {currentUser.role === 'admin' && bill.status !== 'voided' && (
                                                     <button onClick={() => handleVoidClick(bill)} className="text-red-600 hover:text-red-900 ml-2">
                                                         Void
                                                     </button>
                                                 )}
                                                 
-                                                {/* User Actions - Request Cancellation */}
+                                                {/* User Actions: Request Cancel/Modify */}
                                                 {currentUser.role !== 'admin' && bill.status !== 'voided' && !bill.cancellationRequest && (
                                                     <button onClick={() => handleRequestCancelClick(bill)} className="text-red-500 hover:text-red-700 ml-2">
                                                         Req. Cancel
                                                     </button>
                                                 )}
-                                                
-                                                {/* Pending Cancel Status */}
-                                                {bill.cancellationRequest?.status === 'pending' && (
-                                                    <span className="text-xs text-orange-600 font-semibold ml-2 block sm:inline">Cancel Requested</span>
-                                                )}
-
-                                                {/* User Actions - Request Modification */}
-                                                {currentUser.role !== 'admin' && bill.status !== 'voided' && !bill.modificationRequest && (
+                                                 {currentUser.role !== 'admin' && bill.status !== 'voided' && !bill.modificationRequest && (
                                                     <button onClick={() => handleRequestModifyClick(bill)} className="text-blue-600 hover:text-blue-800 ml-2">
                                                         Req. Modify
                                                     </button>
                                                 )}
 
-                                                {/* Pending Modify Status */}
-                                                {bill.modificationRequest?.status === 'pending' && (
-                                                    <span className="text-xs text-blue-600 font-semibold ml-2 block sm:inline">Modify Requested</span>
+                                                {/* Admin Processing Actions for Requests */}
+                                                {currentUser.role === 'admin' && bill.status !== 'voided' && (
+                                                    <div className="inline-flex items-center gap-1 ml-2">
+                                                        {bill.cancellationRequest?.status === 'pending' && (
+                                                            <>
+                                                                <button onClick={() => onProcessCancellation(bill.billNumber, 'approve')} className="text-green-600 hover:text-green-800 bg-green-50 p-1 rounded" title="Approve Cancellation">✓</button>
+                                                                <button onClick={() => onProcessCancellation(bill.billNumber, 'reject')} className="text-red-600 hover:text-red-800 bg-red-50 p-1 rounded" title="Reject Cancellation">✗</button>
+                                                            </>
+                                                        )}
+                                                        {bill.modificationRequest?.status === 'pending' && (
+                                                            <>
+                                                                <button onClick={() => handleModifyApprove(bill)} className="text-green-600 hover:text-green-800 bg-green-50 p-1 rounded" title="Approve & Edit">✓</button>
+                                                                <button onClick={() => onProcessModification(bill.billNumber, 'reject')} className="text-red-600 hover:text-red-800 bg-red-50 p-1 rounded" title="Reject Modification">✗</button>
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </>
                                         )}
