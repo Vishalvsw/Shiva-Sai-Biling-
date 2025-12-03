@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Test, PatientDetails, BillItem, PaymentDetails, User, SavedBill, AppSettings, TestCategory, AuditLogEntry } from './types';
-import { DEFAULT_TEST_DATA, DEFAULT_SETTINGS } from './constants';
+import { DEFAULT_TEST_DATA, DEFAULT_SETTINGS, DATA_VERSION } from './constants';
 import { USERS } from './users';
 import TestSelector from './components/TestSelector';
 import Bill from './components/Bill';
@@ -45,12 +45,26 @@ const App: React.FC = () => {
         return saved ? JSON.parse(saved) : USERS;
     });
 
+    // Initialize Test Data with Version Check
     const [testData, setTestData] = useState<TestCategory[]>(() => {
+        const savedVersion = localStorage.getItem('dataVersion');
+        if (savedVersion !== DATA_VERSION) {
+            // Version mismatch, force use of new default data
+            console.log("Data version mismatch. Resetting test data to defaults.");
+            return DEFAULT_TEST_DATA;
+        }
         const saved = localStorage.getItem('testData');
         return saved ? JSON.parse(saved) : DEFAULT_TEST_DATA;
     });
     
+    // Initialize Settings with Version Check
     const [settings, setSettings] = useState<AppSettings>(() => {
+        const savedVersion = localStorage.getItem('dataVersion');
+        if (savedVersion !== DATA_VERSION) {
+            // Version mismatch, force use of new default settings
+             console.log("Data version mismatch. Resetting settings to defaults.");
+            return DEFAULT_SETTINGS;
+        }
         const saved = localStorage.getItem('appSettings');
         return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
     });
@@ -106,6 +120,11 @@ const App: React.FC = () => {
         return () => clearTimeout(timer);
     }, []);
     
+    // Persist current data version
+    useEffect(() => {
+        localStorage.setItem('dataVersion', DATA_VERSION);
+    }, []);
+
     useEffect(() => {
         if (currentUser) {
             localStorage.setItem('currentUser', JSON.stringify(currentUser));

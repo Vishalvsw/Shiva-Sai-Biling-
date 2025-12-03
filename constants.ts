@@ -2,6 +2,10 @@
 import { TestCategory, AppSettings } from './types';
 import { REFERRING_DOCTORS } from './referringDoctors';
 
+// Increment this version whenever you make structural changes to DEFAULT_TEST_DATA
+// to force the app to ignore cached localStorage data and load the new defaults.
+export const DATA_VERSION = '2.1'; 
+
 export const DEFAULT_TEST_DATA: TestCategory[] = [
   {
     category: 'CT SCAN-DAY',
