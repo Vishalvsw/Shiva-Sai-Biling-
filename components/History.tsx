@@ -132,6 +132,10 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, o
                             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Patient Name</th>
                             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Bill Type</th>
                             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Billed By</th>
+                            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Doctor</th>
+                            {currentUser.role === 'admin' && (
+                                <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">Comm.</th>
+                            )}
                             <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">Total</th>
                             <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-slate-900">Payment</th>
                             <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-slate-900">Verification</th>
@@ -143,7 +147,7 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, o
                     <tbody className="divide-y divide-slate-200 bg-white">
                         {filteredBills.length === 0 ? (
                             <tr>
-                                <td colSpan={9} className="text-center py-10 text-slate-500 italic">
+                                <td colSpan={currentUser.role === 'admin' ? 11 : 10} className="text-center py-10 text-slate-500 italic">
                                     {savedBills.length === 0 ? 'No bills have been saved yet.' : 'No matching bills found.'}
                                 </td>
                             </tr>
@@ -159,6 +163,12 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, o
                                         </span>
                                     </td>
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">{bill.billedBy}</td>
+                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">{bill.patientDetails.refdBy || '-'}</td>
+                                    {currentUser.role === 'admin' && (
+                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right">
+                                            {bill.totalCommissionAmount > 0 ? `₹${bill.totalCommissionAmount.toFixed(2)}` : '-'}
+                                        </td>
+                                    )}
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right">₹{bill.totalAmount.toFixed(2)}</td>
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-center">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusBadge(bill.paymentStatus)}`}>
