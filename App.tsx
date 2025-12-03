@@ -45,24 +45,18 @@ const App: React.FC = () => {
         return saved ? JSON.parse(saved) : USERS;
     });
 
-    // Initialize Test Data with Version Check
     const [testData, setTestData] = useState<TestCategory[]>(() => {
         const savedVersion = localStorage.getItem('dataVersion');
         if (savedVersion !== DATA_VERSION) {
-            // Version mismatch, force use of new default data
-            console.log("Data version mismatch. Resetting test data to defaults.");
             return DEFAULT_TEST_DATA;
         }
         const saved = localStorage.getItem('testData');
         return saved ? JSON.parse(saved) : DEFAULT_TEST_DATA;
     });
     
-    // Initialize Settings with Version Check
     const [settings, setSettings] = useState<AppSettings>(() => {
         const savedVersion = localStorage.getItem('dataVersion');
         if (savedVersion !== DATA_VERSION) {
-            // Version mismatch, force use of new default settings
-             console.log("Data version mismatch. Resetting settings to defaults.");
             return DEFAULT_SETTINGS;
         }
         const saved = localStorage.getItem('appSettings');
@@ -82,7 +76,6 @@ const App: React.FC = () => {
 
      const [totalDiscount, setTotalDiscount] = useState<number>(() => {
         const saved = localStorage.getItem('totalDiscount');
-        // If tax was previously saved (old version), reset to 0
         return saved ? JSON.parse(saved) : 0;
     });
 
@@ -120,7 +113,6 @@ const App: React.FC = () => {
         return () => clearTimeout(timer);
     }, []);
     
-    // Persist current data version
     useEffect(() => {
         localStorage.setItem('dataVersion', DATA_VERSION);
     }, []);
@@ -133,21 +125,44 @@ const App: React.FC = () => {
         }
     }, [currentUser]);
 
-    // Data persistence effects
     useEffect(() => { localStorage.setItem('appUsers', JSON.stringify(users)); }, [users]);
     useEffect(() => { localStorage.setItem('testData', JSON.stringify(testData)); }, [testData]);
     useEffect(() => { localStorage.setItem('appSettings', JSON.stringify(settings)); }, [settings]);
     useEffect(() => { localStorage.setItem('savedBills', JSON.stringify(savedBills)); }, [savedBills]);
     useEffect(() => { localStorage.setItem('auditLog', JSON.stringify(auditLog)); }, [auditLog]);
 
-    // Current bill persistence effects
     useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('patientDetails', JSON.stringify(patientDetails)); }, [patientDetails, viewMode, isEditingArchivedBill]);
     useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('billItems', JSON.stringify(billItems)); }, [billItems, viewMode, isEditingArchivedBill]);
     useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('totalDiscount', JSON.stringify(totalDiscount)); }, [totalDiscount, viewMode, isEditingArchivedBill]);
     useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('paymentDetails', JSON.stringify(paymentDetails)); }, [paymentDetails, viewMode, isEditingArchivedBill]);
     useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('currentBillNumber', JSON.stringify(billNumber)); }, [billNumber, viewMode, isEditingArchivedBill]);
 
-    // Auto-delete old bills effect
+    // Update bill items' active price and commission when global shift changes (Dynamic Pricing)
+    useEffect(() => {
+        if (!isEditingArchivedBill && billItems.length > 0) {
+            setBillItems(prevItems => prevItems.map(item => {
+                // Find current test data to get latest price
+                let currentTestData: Test | undefined;
+                for (const cat of testData) {
+                    const found = cat.tests.find(t => t.id === item.id);
+                    if (found) { currentTestData = found; break; }
+                }
+
+                if (currentTestData) {
+                    const isNight = settings.currentShift === 'Night';
+                    return {
+                        ...item,
+                        activePrice: isNight && currentTestData.priceNight ? currentTestData.priceNight : currentTestData.price,
+                        activeCommission: isNight ? (currentTestData.commissionNight || 0) : (currentTestData.commissionDay || 0)
+                    };
+                }
+                return item;
+            }));
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [settings.currentShift, testData]);
+
+
     useEffect(() => {
         if (settings.autoDeleteDays > 0) {
             const cutoffDate = new Date();
@@ -156,12 +171,10 @@ const App: React.FC = () => {
             const billsToKeep = savedBills.filter(bill => new Date(bill.date) >= cutoffDate);
 
             if (billsToKeep.length < savedBills.length) {
-                console.log(`Auto-deleted ${savedBills.length - billsToKeep.length} bills older than ${settings.autoDeleteDays} days.`);
                 setSavedBills(billsToKeep);
             }
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [settings.autoDeleteDays]); // Only run on initial load
+    }, [settings.autoDeleteDays]); 
 
     // --- LOGGING ---
     const logAction = useCallback((action: string, details: string) => {
@@ -181,16 +194,7 @@ const App: React.FC = () => {
         if (userInDb && userInDb.password === password) {
             const user: User = { username, role: userInDb.role };
             setCurrentUser(user);
-
-            // Log action immediately after setting user
-            const newEntry: AuditLogEntry = {
-                timestamp: new Date().toISOString(),
-                user: user.username,
-                action: 'LOGIN',
-                details: `User logged in.`,
-            };
-            setAuditLog(prev => [newEntry, ...prev]);
-
+            logAction('LOGIN', `User logged in.`);
             const initialView = user.role === 'admin' ? 'dashboard' : 'billing';
             setViewMode(initialView);
             setAdminView('main');
@@ -206,32 +210,39 @@ const App: React.FC = () => {
     };
 
     const handleAddTest = useCallback((test: Test) => {
-        // Prevent adding new tests if an archived bill is loaded and user is not an admin
         if (isEditingArchivedBill && currentUser?.role !== 'admin') {
-            alert("Cannot add new tests when viewing an archived bill. Please use 'New Bill' to start fresh or 'Edit Bill' to modify the current one.");
+            alert("Cannot add new tests when viewing an archived bill.");
             return;
         }
         setBillItems(prevItems => {
             if (prevItems.some(item => item.id === test.id)) {
                 return prevItems;
             }
-            return [...prevItems, { ...test, discount: 0 }];
+            // Determine price and commission based on current shift
+            const isNight = settings.currentShift === 'Night';
+            const price = isNight && test.priceNight ? test.priceNight : test.price;
+            const commission = isNight ? (test.commissionNight || 0) : (test.commissionDay || 0);
+
+            return [...prevItems, { 
+                ...test, 
+                discount: 0, 
+                activePrice: price, 
+                activeCommission: commission 
+            }];
         });
-    }, [isEditingArchivedBill, currentUser]);
+    }, [isEditingArchivedBill, currentUser, settings.currentShift]);
 
     const handleRemoveTest = useCallback((testId: string) => {
-        // Prevent removing tests if an archived bill is loaded and user is not an admin
         if (isEditingArchivedBill && currentUser?.role !== 'admin') {
-            alert("Cannot remove tests when viewing an archived bill. Please use 'New Bill' to start fresh or 'Edit Bill' to modify the current one.");
+            alert("Cannot remove tests when viewing an archived bill.");
             return;
         }
         setBillItems(prevItems => prevItems.filter(item => item.id !== testId));
     }, [isEditingArchivedBill, currentUser]);
     
     const handleItemDiscountChange = useCallback((testId: string, discountValue: number) => {
-        // Prevent changing discounts if an archived bill is loaded and user is not an admin
         if (isEditingArchivedBill && currentUser?.role !== 'admin') {
-            alert("Cannot change discounts when viewing an archived bill. Please use 'New Bill' to start fresh or 'Edit Bill' to modify the current one.");
+            alert("Cannot change discounts when viewing an archived bill.");
             return;
         }
         setBillItems(prevItems =>
@@ -242,12 +253,10 @@ const App: React.FC = () => {
     }, [isEditingArchivedBill, currentUser]);
 
     const handleClearBill = useCallback(() => {
-        // Only log if it was an active bill (not just opening a new empty form)
         if (billItems.length > 0 && !isEditingArchivedBill) { 
             logAction('BILL_CLEARED', `Cleared unsaved bill #${billNumber}.`);
         }
         
-        // Calculate the next available bill number
         const lastExistingBillNumber = Math.max(
             parseInt(localStorage.getItem('lastBillNumber') || '0', 10),
             ...savedBills.map(b => b.billNumber)
@@ -256,36 +265,36 @@ const App: React.FC = () => {
 
         setBillItems([]);
         setPatientDetails({ name: '', age: '', sex: '', refdBy: '' });
-        setTotalDiscount(0); // Reset total discount to 0%
+        setTotalDiscount(0);
         setPaymentDetails({ paymentMethod: '', amountPaid: 0 });
-        setBillNumber(newBillNumber); // Increment bill number for a truly new bill
-        setIsEditingArchivedBill(false); // Clear archived view state
+        setBillNumber(newBillNumber);
+        setIsEditingArchivedBill(false); 
         setViewedBillDetails(null);
     }, [savedBills, billItems.length, billNumber, logAction, isEditingArchivedBill]);
 
     const handleResetCurrentBill = useCallback(() => {
         if (isEditingArchivedBill && currentUser?.role !== 'admin') {
-            alert("Only admins can reset an archived bill. To start a new bill, click 'New Bill'.");
+            alert("Only admins can reset an archived bill.");
             return;
         }
 
         if (window.confirm('Are you sure you want to reset the current form? All unsaved data will be cleared.')) {
-            if (billItems.length > 0) { // Only log if it was an active bill
+            if (billItems.length > 0) {
                 logAction('BILL_RESET_FORM', `Reset current bill form #${billNumber}.`);
             }
             setBillItems([]);
             setPatientDetails({ name: '', age: '', sex: '', refdBy: '' });
-            setTotalDiscount(0); // Reset total discount to 0%
+            setTotalDiscount(0);
             setPaymentDetails({ paymentMethod: '', amountPaid: 0 });
-            // Do NOT change billNumber here, it keeps the current bill number
-            setIsEditingArchivedBill(false); // Clear archived view state
+            setIsEditingArchivedBill(false);
             setViewedBillDetails(null);
         }
     }, [billItems.length, billNumber, logAction, isEditingArchivedBill, currentUser]);
 
 
     const calculateBillTotals = useCallback((items: BillItem[], discountPercentage: number, referredBy: string) => {
-        const subtotal = items.reduce((acc, item) => acc + item.price, 0);
+        // Use activePrice for calculations (handles day/night)
+        const subtotal = items.reduce((acc, item) => acc + item.activePrice, 0);
         const itemDiscounts = items.reduce((acc, item) => acc + item.discount, 0);
 
         const subtotalAfterItemDiscounts = subtotal - itemDiscounts;
@@ -297,10 +306,10 @@ const App: React.FC = () => {
         const tax = 0; 
         const total = finalAmountBeforePayment + tax;
 
-        // Calculate total commission based on individual test commissions if a doctor is referred
         let totalCommissionAmount = 0;
         if (referredBy.trim() !== '') {
-            totalCommissionAmount = items.reduce((acc, item) => acc + (item.commissionDay || 0), 0);
+            // Use activeCommission
+            totalCommissionAmount = items.reduce((acc, item) => acc + item.activeCommission, 0);
         }
 
         return { subtotal, totalDiscountAmount, billDiscountAmount, total, totalCommissionAmount };
@@ -310,11 +319,9 @@ const App: React.FC = () => {
     const handleSaveBill = useCallback(() => {
         if (!currentUser || billItems.length === 0) return;
         if (isEditingArchivedBill) {
-            console.error("Attempted to Save new bill while editing an archived one. Use handleUpdateBill instead.");
             return;
         }
 
-        // Determine Bill Type
         let billType: 'Standard' | 'Department' = 'Standard';
         let department: string | undefined = undefined;
 
@@ -344,11 +351,11 @@ const App: React.FC = () => {
             date: new Date().toISOString(),
             patientDetails,
             billItems,
-            totalDiscount, // Now a percentage
+            totalDiscount,
             paymentDetails,
-            totalCommissionAmount, // Calculated based on items
+            totalCommissionAmount,
             subtotal,
-            tax: 0, // Always 0 now
+            tax: 0,
             totalAmount: total,
             balanceDue,
             paymentStatus,
@@ -357,25 +364,23 @@ const App: React.FC = () => {
             status: 'active',
             billType,
             department,
+            shift: settings.currentShift, // Save the shift used
         };
         
-        logAction('BILL_SAVED', `Bill #${billNumber} saved for "${patientDetails.name}". Type: ${department || 'Standard'}. Total: ₹${total.toFixed(2)}, Paid: ₹${paymentDetails.amountPaid.toFixed(2)}. Commission: ₹${totalCommissionAmount.toFixed(2)}.`);
+        logAction('BILL_SAVED', `Bill #${billNumber} saved. Shift: ${settings.currentShift}. Total: ₹${total.toFixed(2)}.`);
         setSavedBills(prev => [...prev, newSavedBill]);
         localStorage.setItem('lastBillNumber', billNumber.toString());
         
-        // Instead of clearing the bill, we enter "view mode" for the saved bill so buttons can be shown.
-        // We set the details to the bill we just saved.
         setViewedBillDetails(newSavedBill);
         setIsEditingArchivedBill(true); 
     }, [billItems, patientDetails, totalDiscount, paymentDetails, billNumber, settings, logAction, currentUser, testData, calculateBillTotals, isEditingArchivedBill]);
 
     const handleUpdateBill = useCallback(() => {
         if (!currentUser || currentUser.role !== 'admin' || !isEditingArchivedBill || !viewedBillDetails) {
-            alert("Unauthorized or invalid attempt to update bill.");
+            alert("Unauthorized update attempt.");
             return;
         }
 
-        // Determine Bill Type
         let billType: 'Standard' | 'Department' = 'Standard';
         let department: string | undefined = undefined;
 
@@ -398,9 +403,8 @@ const App: React.FC = () => {
             paymentStatus = 'Paid';
         }
 
-        // Refined verification status logic
         let newVerificationStatus: 'Verified' | 'Pending' | 'Rejected' = viewedBillDetails.verificationStatus;
-        if (newVerificationStatus !== 'Rejected') { // If it was already rejected, keep it rejected unless admin explicitly approves
+        if (newVerificationStatus !== 'Rejected') { 
             if (total >= settings.verificationThreshold) {
                 newVerificationStatus = 'Pending';
             } else {
@@ -410,7 +414,7 @@ const App: React.FC = () => {
 
 
         const updatedBill: SavedBill = {
-            ...viewedBillDetails, // Keep original bill number, date, billedBy
+            ...viewedBillDetails,
             patientDetails,
             billItems,
             totalDiscount,
@@ -431,11 +435,11 @@ const App: React.FC = () => {
         setSavedBills(prev => prev.map(bill => 
             bill.billNumber === updatedBill.billNumber ? updatedBill : bill
         ));
-        logAction('BILL_UPDATED', `Bill #${updatedBill.billNumber} was updated by ${currentUser.username}. Total: ₹${total.toFixed(2)}. Commission: ₹${totalCommissionAmount.toFixed(2)}. Verification Status: ${newVerificationStatus}.`);
+        logAction('BILL_UPDATED', `Bill #${updatedBill.billNumber} updated.`);
         
         setIsEditingArchivedBill(false);
         setViewedBillDetails(null);
-        handleClearBill(); // Clear current form after update
+        handleClearBill(); 
         alert(`Bill #${updatedBill.billNumber} updated successfully!`);
 
     }, [currentUser, isEditingArchivedBill, viewedBillDetails, billItems, patientDetails, totalDiscount, paymentDetails, testData, settings.verificationThreshold, calculateBillTotals, logAction, handleClearBill]);
@@ -461,7 +465,7 @@ const App: React.FC = () => {
                 : bill
             )
         );
-        logAction('BILL_VOIDED', `Bill #${billNumberToVoid} was voided by ${currentUser.username}. Reason: ${reason}`);
+        logAction('BILL_VOIDED', `Bill #${billNumberToVoid} voided. Reason: ${reason}`);
     }, [currentUser, logAction]);
     
     const handleRequestCancellation = useCallback((billNumberToCancel: number, reason: string) => {
@@ -481,7 +485,7 @@ const App: React.FC = () => {
                 : bill
             )
         );
-        logAction('CANCELLATION_REQUESTED', `Cancellation requested for Bill #${billNumberToCancel} by ${currentUser.username}. Reason: ${reason}`);
+        logAction('CANCELLATION_REQUESTED', `Cancellation requested for Bill #${billNumberToCancel}.`);
     }, [currentUser, logAction]);
 
     const handleVerifyBill = useCallback((billNumberToVerify: number, isApproved: boolean, reason?: string) => {
@@ -491,10 +495,10 @@ const App: React.FC = () => {
             prevBills.map(bill => {
                 if (bill.billNumber === billNumberToVerify) {
                     if (isApproved) {
-                        logAction('BILL_VERIFIED', `Bill #${billNumberToVerify} was approved by ${currentUser.username}.`);
+                        logAction('BILL_VERIFIED', `Bill #${billNumberToVerify} approved.`);
                         return { ...bill, verificationStatus: 'Verified', lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.username };
                     } else {
-                        logAction('BILL_REJECTED', `Bill #${billNumberToVerify} was rejected by ${currentUser.username}. Reason: ${reason}.`);
+                        logAction('BILL_REJECTED', `Bill #${billNumberToVerify} rejected.`);
                         return { ...bill, verificationStatus: 'Rejected', rejectionReason: reason, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.username };
                     }
                 }
@@ -504,19 +508,16 @@ const App: React.FC = () => {
     }, [currentUser, logAction]);
 
     const handleViewArchivedBill = useCallback((bill: SavedBill) => {
-        // ALLOW ALL USERS TO VIEW
-        
-        // Load the archived bill into the current billing state
-        setBillNumber(bill.billNumber); // Use original bill number
+        setBillNumber(bill.billNumber);
         setPatientDetails(bill.patientDetails);
-        setBillItems(bill.billItems.map(item => ({...item}))); // Deep copy items
+        setBillItems(bill.billItems.map(item => ({...item})));
         setTotalDiscount(bill.totalDiscount);
         setPaymentDetails(bill.paymentDetails);
-        setIsEditingArchivedBill(true); // Set flag
-        setViewedBillDetails(bill); // Store original bill details
+        setIsEditingArchivedBill(true); 
+        setViewedBillDetails(bill);
         setViewMode('billing');
         setAdminView('main');
-        logAction('VIEW_ARCHIVED_BILL', `${currentUser?.username} viewed archived bill #${bill.billNumber}.`);
+        logAction('VIEW_ARCHIVED_BILL', `Viewed bill #${bill.billNumber}.`);
     }, [currentUser, logAction]);
 
     const handleSetViewMode = (mode: 'billing' | 'history' | 'dashboard') => {
@@ -534,10 +535,17 @@ const App: React.FC = () => {
         return <LoginPage onLogin={handleLogin} />;
     }
     
-    const renderContent = () => {
-        switch (viewMode) {
-            case 'billing':
-                return (
+    return (
+        <div className="flex flex-col min-h-screen bg-gray-50 font-sans print:bg-white">
+            <Header 
+                currentUser={currentUser} 
+                onLogout={handleLogout}
+                viewMode={viewMode}
+                onSetViewMode={handleSetViewMode}
+                settings={settings}
+            />
+            <main className="flex-grow p-4 sm:p-6 md:p-8 print:p-0">
+                 {viewMode === 'billing' && (
                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 print:grid-cols-1">
                         <div className="print:hidden">
                             <TestSelector 
@@ -545,7 +553,6 @@ const App: React.FC = () => {
                                 onAddTest={handleAddTest}
                                 onRemoveTest={handleRemoveTest}
                                 currentBillItems={billItems} 
-                                // Disable selector if an archived bill is loaded AND user is not admin
                                 isDisabled={isEditingArchivedBill && currentUser.role !== 'admin'} 
                             />
                         </div>
@@ -558,7 +565,7 @@ const App: React.FC = () => {
                                 onRemoveItem={handleRemoveTest}
                                 onClearBill={handleClearBill}
                                 onSaveBill={handleSaveBill}
-                                onUpdateBill={handleUpdateBill} // Pass new update handler
+                                onUpdateBill={handleUpdateBill}
                                 onResetBill={handleResetCurrentBill}
                                 billNumber={billNumber}
                                 totalDiscount={totalDiscount}
@@ -567,57 +574,29 @@ const App: React.FC = () => {
                                 paymentDetails={paymentDetails}
                                 onPaymentDetailsChange={setPaymentDetails}
                                 userRole={currentUser.role}
-                                isEditingArchivedBill={isEditingArchivedBill} // Pass flag
+                                isEditingArchivedBill={isEditingArchivedBill}
                                 viewedBillDetails={viewedBillDetails}
                                 settings={settings}
-                                calculateBillTotals={calculateBillTotals} // Pass calculation utility
+                                calculateBillTotals={calculateBillTotals}
                             />
                         </div>
                     </div>
-                );
-            case 'history':
-                return <History savedBills={savedBills} onViewBill={handleViewArchivedBill} onVoidBill={handleVoidBill} onRequestCancellation={handleRequestCancellation} onVerifyBill={handleVerifyBill} currentUser={currentUser} />;
-            case 'dashboard':
-                if (currentUser.role === 'admin') {
-                    switch(adminView) {
-                        case 'reports':
-                            return <BillingReports savedBills={savedBills} testData={testData} onBack={() => setAdminView('main')} />;
-                        case 'users':
-                           return <ManageUsers users={users} setUsers={setUsers} onBack={() => setAdminView('main')} />;
-                        case 'tests':
-                            return <ManageTests testData={testData} setTestData={setTestData} onBack={() => setAdminView('main')} />;
-                        case 'backup':
-                            return <BackupRestore onBack={() => setAdminView('main')} />;
-                        case 'settings':
-                            return <Settings settings={settings} setSettings={setSettings} onBack={() => setAdminView('main')} />;
-                        case 'activity':
-                            return <ActivityLog auditLog={auditLog} onBack={() => setAdminView('main')} />;
-                        case 'workflow':
-                            return <Workflow onBack={() => setAdminView('main')} />;
-                        case 'main':
-                        default:
-                            return <AdminDashboard onSelectView={setAdminView} savedBills={savedBills} />;
-                    }
-                }
-                // Fallback for non-admins trying to access dashboard
-                setViewMode('billing');
-                return null;
-            default:
-                return null;
-        }
-    }
-
-    return (
-        <div className="flex flex-col min-h-screen bg-gray-50 font-sans print:bg-white">
-            <Header 
-                currentUser={currentUser} 
-                onLogout={handleLogout}
-                viewMode={viewMode}
-                onSetViewMode={handleSetViewMode}
-                settings={settings}
-            />
-            <main className="flex-grow p-4 sm:p-6 md:p-8 print:p-0">
-                 {renderContent()}
+                 )}
+                 {viewMode === 'history' && (
+                     <History savedBills={savedBills} onViewBill={handleViewArchivedBill} onVoidBill={handleVoidBill} onRequestCancellation={handleRequestCancellation} onVerifyBill={handleVerifyBill} currentUser={currentUser} />
+                 )}
+                 {viewMode === 'dashboard' && currentUser.role === 'admin' && (
+                     <>
+                        {adminView === 'main' && <AdminDashboard onSelectView={setAdminView} savedBills={savedBills} settings={settings} setSettings={setSettings} />}
+                        {adminView === 'reports' && <BillingReports savedBills={savedBills} testData={testData} onBack={() => setAdminView('main')} />}
+                        {adminView === 'users' && <ManageUsers users={users} setUsers={setUsers} onBack={() => setAdminView('main')} />}
+                        {adminView === 'tests' && <ManageTests testData={testData} setTestData={setTestData} onBack={() => setAdminView('main')} />}
+                        {adminView === 'backup' && <BackupRestore onBack={() => setAdminView('main')} />}
+                        {adminView === 'settings' && <Settings settings={settings} setSettings={setSettings} onBack={() => setAdminView('main')} />}
+                        {adminView === 'activity' && <ActivityLog auditLog={auditLog} onBack={() => setAdminView('main')} />}
+                        {adminView === 'workflow' && <Workflow onBack={() => setAdminView('main')} />}
+                     </>
+                 )}
             </main>
             <Footer labName={settings.labName} />
         </div>

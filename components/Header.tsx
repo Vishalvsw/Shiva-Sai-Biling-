@@ -30,13 +30,21 @@ const NavButton: React.FC<{
 const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, viewMode, onSetViewMode, settings }) => {
     return (
         <header className="bg-gradient-to-r from-[#143A78] to-[#2057b5] shadow-lg p-4 print:hidden">
-            <div className="container mx-auto flex justify-between items-center">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-white">{settings.labName}</h1>
-                    <p className="text-sm text-blue-100">Offline Billing System</p>
+            <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-4">
+                     <div>
+                        <h1 className="text-xl sm:text-2xl font-bold text-white leading-tight">{settings.labName}</h1>
+                        <p className="text-sm text-blue-100">Offline Billing System</p>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <nav className="flex items-center gap-2 border-r border-blue-400 pr-2 mr-2">
+                
+                <div className="flex items-center gap-4">
+                    {/* Shift Indicator */}
+                    <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${settings.currentShift === 'Day' ? 'bg-yellow-400 text-yellow-900' : 'bg-indigo-900 text-indigo-100 border border-indigo-700'}`}>
+                        {settings.currentShift} Mode
+                    </div>
+
+                    <nav className="flex items-center gap-2 border-r border-blue-400 pr-2">
                          {currentUser.role === 'admin' && (
                              <NavButton isActive={viewMode === 'dashboard'} onClick={() => onSetViewMode('dashboard')}>
                                 Dashboard
@@ -49,13 +57,13 @@ const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, viewMode, onSetV
                            History
                         </NavButton>
                     </nav>
-                    <div className="text-right">
-                        <p className="font-semibold text-white">Welcome, {currentUser.username}</p>
+                    <div className="text-right hidden sm:block">
+                        <p className="font-semibold text-white text-sm">{currentUser.username}</p>
                         <p className="text-xs text-blue-200 capitalize">{currentUser.role}</p>
                     </div>
                     <button 
                         onClick={onLogout}
-                        className="px-3 py-1.5 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600"
+                        className="px-3 py-1.5 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 shadow-sm"
                     >
                         Logout
                     </button>

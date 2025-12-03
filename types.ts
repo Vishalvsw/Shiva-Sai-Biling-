@@ -2,8 +2,9 @@
 export interface Test {
     id: string;
     name: string;
-    price: number;
-    subcategory?: string; // Added for tree-view organization
+    price: number; // Day Price
+    priceNight?: number; // Night Price
+    subcategory?: string; 
     commissionDay?: number;
     commissionNight?: number;
 }
@@ -22,7 +23,9 @@ export interface PatientDetails {
 }
 
 export interface BillItem extends Test {
-    discount: number; // Discount per item is still in absolute amount
+    discount: number; 
+    activePrice: number; // The price actually used (Day or Night)
+    activeCommission: number; // The commission actually used
 }
 
 export interface PaymentDetails {
@@ -40,11 +43,11 @@ export interface SavedBill {
     date: string; // ISO string
     patientDetails: PatientDetails;
     billItems: BillItem[];
-    totalDiscount: number; // This will now be a percentage for bill-level discount
+    totalDiscount: number;
     paymentDetails: PaymentDetails;
-    totalCommissionAmount: number; // Added to store calculated commission for a bill
+    totalCommissionAmount: number;
     subtotal: number;
-    tax: number; // Tax is removed from calculations, but kept in type for historical data, will be 0
+    tax: number;
     totalAmount: number;
     balanceDue: number;
     paymentStatus: 'Paid' | 'Partial' | 'Unpaid';
@@ -52,9 +55,10 @@ export interface SavedBill {
     verificationStatus: 'Verified' | 'Pending' | 'Rejected';
     rejectionReason?: string;
     status: 'active' | 'voided';
+    shift: 'Day' | 'Night'; // Track which shift this bill belongs to
     voidedInfo?: {
         voidedBy: string;
-        voidedAt: string; // ISO string
+        voidedAt: string;
         reason: string;
     };
     cancellationRequest?: {
@@ -65,22 +69,23 @@ export interface SavedBill {
     };
     billType: 'Standard' | 'Department';
     department?: string;
-    lastModifiedAt?: string; // Added for audit trail on modifications
-    lastModifiedBy?: string; // Added for audit trail on modifications
+    lastModifiedAt?: string;
+    lastModifiedBy?: string;
 }
 
 export interface AppSettings {
     labName: string;
     labAddress: string;
     labContact: string;
-    taxRate: number; // Tax is removed from calculations, but kept in type for potential future use or historical data context
+    taxRate: number;
     referringDoctors: string[];
     autoDeleteDays: number;
     verificationThreshold: number;
+    currentShift: 'Day' | 'Night'; // Global toggle for current pricing mode
 }
 
 export interface AuditLogEntry {
-    timestamp: string; // ISO string
+    timestamp: string;
     user: string;
     action: string;
     details: string;

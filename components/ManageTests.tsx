@@ -10,7 +10,7 @@ interface ManageTestsProps {
 
 const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack }) => {
     const [editingTest, setEditingTest] = useState<{ catIndex: number; testIndex: number; test: Test } | null>(null);
-    const [isCreatingTest, setIsCreatingTest] = useState<number | null>(null); // Index of category to add test to
+    const [isCreatingTest, setIsCreatingTest] = useState<number | null>(null);
 
     const handleCategoryChange = (index: number, newName: string) => {
         const newData = [...testData];
@@ -34,13 +34,13 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
 
     const handleSaveTest = (catIndex: number, originalTestId: string | undefined, updatedTest: Test) => {
         const newData = [...testData];
-        if (originalTestId) { // Editing existing test
+        if (originalTestId) { 
             const testIndex = newData[catIndex].tests.findIndex(t => t.id === originalTestId);
             if (testIndex !== -1) {
                 newData[catIndex].tests[testIndex] = updatedTest;
                 alert('Test updated successfully!');
             }
-        } else { // Adding new test
+        } else {
             newData[catIndex].tests.push({ ...updatedTest, id: `custom-${Date.now()}` });
             alert('Test added successfully!');
         }
@@ -60,7 +60,7 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
 
     interface TestFormProps {
         categoryIndex: number;
-        test?: Test; // Optional, if editing an existing test
+        test?: Test;
         onSave: (catIndex: number, originalTestId: string | undefined, updatedTest: Test) => void;
         onCancel: () => void;
     }
@@ -68,6 +68,7 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
     const TestForm: React.FC<TestFormProps> = ({ categoryIndex, test, onSave, onCancel }) => {
         const [name, setName] = useState(test?.name || '');
         const [price, setPrice] = useState(test?.price || 0);
+        const [priceNight, setPriceNight] = useState(test?.priceNight || 0);
         const [subcategory, setSubcategory] = useState(test?.subcategory || '');
         const [commissionDay, setCommissionDay] = useState(test?.commissionDay || 0);
         const [commissionNight, setCommissionNight] = useState(test?.commissionNight || 0);
@@ -78,34 +79,42 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
                 alert('Test name and a positive price are required.');
                 return;
             }
-            onSave(categoryIndex, test?.id, { ...test, name: name.trim(), price, subcategory: subcategory.trim() || undefined, commissionDay, commissionNight } as Test);
+            onSave(categoryIndex, test?.id, { ...test, name: name.trim(), price, priceNight, subcategory: subcategory.trim() || undefined, commissionDay, commissionNight } as Test);
         };
 
         return (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-                <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md space-y-4">
-                    <h3 className="text-xl font-bold">{test ? 'Edit Test' : 'Add New Test'}</h3>
+                <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto">
+                    <h3 className="text-xl font-bold border-b pb-2">{test ? 'Edit Test' : 'Add New Test'}</h3>
                     <div>
                         <label className="block text-sm font-medium text-slate-700">Test Name</label>
-                        <input type="text" value={name} onChange={e => setName(e.target.value)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" required aria-label="Test Name" />
+                        <input type="text" value={name} onChange={e => setName(e.target.value)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" required />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700">Price (₹)</label>
-                        <input type="number" value={price} onChange={e => setPrice(parseFloat(e.target.value) || 0)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" min="0.01" step="0.01" required aria-label="Test Price" />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700">Day Price (₹)</label>
+                            <input type="number" value={price} onChange={e => setPrice(parseFloat(e.target.value) || 0)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" min="0" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700">Night Price (₹)</label>
+                            <input type="number" value={priceNight} onChange={e => setPriceNight(parseFloat(e.target.value) || 0)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" min="0" />
+                        </div>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700">Subcategory (Optional)</label>
-                        <input type="text" value={subcategory} onChange={e => setSubcategory(e.target.value)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" aria-label="Test Subcategory" />
+                        <input type="text" value={subcategory} onChange={e => setSubcategory(e.target.value)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700">Commission Day (₹)</label>
-                        <input type="number" value={commissionDay} onChange={e => setCommissionDay(parseFloat(e.target.value) || 0)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" min="0" step="1" aria-label="Commission Day" />
+                    <div className="grid grid-cols-2 gap-4 bg-slate-50 p-2 rounded">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700">Comm. Day (₹)</label>
+                            <input type="number" value={commissionDay} onChange={e => setCommissionDay(parseFloat(e.target.value) || 0)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" min="0" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700">Comm. Night (₹)</label>
+                            <input type="number" value={commissionNight} onChange={e => setCommissionNight(parseFloat(e.target.value) || 0)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" min="0" />
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700">Commission Night (₹)</label>
-                        <input type="number" value={commissionNight} onChange={e => setCommissionNight(parseFloat(e.target.value) || 0)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" min="0" step="1" aria-label="Commission Night" />
-                    </div>
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-2 pt-2">
                         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200">Cancel</button>
                         <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-[#143A78] rounded-lg hover:bg-blue-900">Save Test</button>
                     </div>
@@ -126,11 +135,7 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
             )}
             <div className="flex justify-between items-center">
                 <h2 className="text-3xl font-bold text-slate-800">Manage Tests</h2>
-                <button
-                    onClick={onBack}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200"
-                    aria-label="Back to Dashboard"
-                >
+                <button onClick={onBack} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                     Back to Dashboard
                 </button>
@@ -138,47 +143,47 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
             
             <div className="bg-white p-6 rounded-xl shadow-lg space-y-4">
                  <div className="flex justify-end">
-                    <button onClick={handleAddCategory} className="px-4 py-2 text-sm font-medium text-white bg-[#143A78] rounded-lg hover:bg-blue-900" aria-label="Add new test category">
-                        Add New Category
-                    </button>
+                    <button onClick={handleAddCategory} className="px-4 py-2 text-sm font-medium text-white bg-[#143A78] rounded-lg hover:bg-blue-900">Add New Category</button>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-6">
                     {testData.map((category, catIndex) => (
-                        <div key={catIndex} className="border border-slate-200 rounded-lg p-4 space-y-3">
-                            <div className="flex justify-between items-center">
+                        <div key={catIndex} className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                            <div className="flex justify-between items-center mb-3">
                                 <input 
                                     type="text"
                                     value={category.category}
                                     onChange={(e) => handleCategoryChange(catIndex, e.target.value)}
-                                    className="text-xl font-bold text-slate-800 border-b-2 border-transparent focus:border-blue-500 outline-none"
-                                    aria-label={`Category name: ${category.category}`}
+                                    className="text-lg font-bold text-slate-800 bg-transparent border-b-2 border-transparent focus:border-blue-500 outline-none"
                                 />
-                                <button onClick={() => handleDeleteCategory(catIndex)} className="text-red-500 hover:text-red-700 text-sm" aria-label={`Delete category ${category.category}`}>Delete Category</button>
+                                <button onClick={() => handleDeleteCategory(catIndex)} className="text-red-500 hover:text-red-700 text-sm font-medium">Delete Category</button>
                             </div>
-                            <div className="pl-4">
-                                <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-2 mb-2 font-semibold text-slate-700">
-                                    <span className="md:col-span-2 lg:col-span-2">Test Name</span>
-                                    <span>Price</span>
+                            <div className="bg-white rounded border border-slate-200 overflow-hidden">
+                                <div className="grid grid-cols-6 gap-2 p-2 bg-slate-100 text-xs font-bold text-slate-600 uppercase tracking-wide">
+                                    <span className="col-span-2">Test Name</span>
+                                    <span>Price (D/N)</span>
                                     <span>Subcategory</span>
-                                    <span>Comm. Day</span>
-                                    <span>Comm. Night</span>
-                                    <span className="sr-only">Actions</span>
+                                    <span>Comm. (D/N)</span>
+                                    <span className="text-right">Actions</span>
                                 </div>
                                 {category.tests.map((test, testIndex) => (
-                                    <div key={test.id} className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-2 py-1 border-t">
-                                        <span className="md:col-span-2 lg:col-span-2 truncate text-sm">{test.name}</span>
-                                        <span className="text-sm">₹{test.price.toFixed(2)}</span>
-                                        <span className="text-sm truncate">{test.subcategory || '-'}</span>
-                                        <span className="text-sm">₹{test.commissionDay?.toFixed(2) || '0.00'}</span>
-                                        <span className="text-sm">₹{test.commissionNight?.toFixed(2) || '0.00'}</span>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => setEditingTest({ catIndex, testIndex, test })} className="text-orange-600 hover:text-orange-800 text-sm" aria-label={`Edit test ${test.name}`}>Edit</button>
-                                            <button onClick={() => handleDeleteTest(catIndex, testIndex)} className="text-red-500 hover:text-red-700 text-sm" aria-label={`Delete test ${test.name}`}>Delete</button>
+                                    <div key={test.id} className="grid grid-cols-6 gap-2 p-2 border-t border-slate-100 items-center hover:bg-slate-50">
+                                        <span className="col-span-2 text-sm font-medium text-slate-800">{test.name}</span>
+                                        <span className="text-sm">₹{test.price} / <span className="text-indigo-600">₹{test.priceNight || test.price}</span></span>
+                                        <span className="text-sm text-slate-500 truncate">{test.subcategory || '-'}</span>
+                                        <span className="text-sm">₹{test.commissionDay} / <span className="text-indigo-600">₹{test.commissionNight}</span></span>
+                                        <div className="flex justify-end gap-3">
+                                            <button onClick={() => setEditingTest({ catIndex, testIndex, test })} className="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</button>
+                                            <button onClick={() => handleDeleteTest(catIndex, testIndex)} className="text-red-500 hover:text-red-700 text-sm font-medium">Delete</button>
                                         </div>
                                     </div>
                                 ))}
-                                <button onClick={() => setIsCreatingTest(catIndex)} className="mt-2 text-sm text-orange-600 hover:text-orange-800" aria-label={`Add new test to ${category.category}`}>+ Add Test</button>
+                                <div className="p-2 border-t border-slate-100 bg-slate-50">
+                                    <button onClick={() => setIsCreatingTest(catIndex)} className="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                        Add Test
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     ))}

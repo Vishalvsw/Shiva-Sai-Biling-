@@ -1,5 +1,4 @@
 
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { TestCategory, Test, BillItem } from '../types';
 
@@ -114,7 +113,7 @@ const TreeItem: React.FC<{
                     onChange={() => handleTestToggle(test)}
                     disabled={isDisabled}
                 />
-                <span className="ml-2 text-base text-slate-700 font-medium select-none"> {/* Updated text size and weight */}
+                <span className="ml-2 text-base text-slate-700 font-medium select-none">
                     {test.name} <span className="text-slate-400 text-xs ml-1" aria-hidden="true">(₹{test.price})</span>
                 </span>
             </label>
@@ -126,7 +125,6 @@ const TreeItem: React.FC<{
             <div
                 className={`flex items-center p-2 rounded-md cursor-pointer transition-colors ${isDisabled ? 'cursor-not-allowed bg-slate-100' : 'hover:bg-slate-100'}`}
                 onClick={() => !isDisabled && setIsOpen(!isOpen)}
-                title={isDisabled ? "Cannot mix tests from different major departments or with standard tests, or bill is being viewed as archived." : ""}
                 role="button"
                 aria-expanded={isOpen}
                 aria-controls={`category-tests-${category.category.replace(/\s/g, '-')}`}
@@ -158,7 +156,7 @@ const TreeItem: React.FC<{
                     {/* Render Subcategories */}
                     {Object.entries(groupedItems.subs).map(([subName, tests]: [string, Test[]]) => (
                         <div key={subName} className="mt-2">
-                            <div className="text-sm font-semibold text-slate-600 mt-3 mb-1 pl-2 border-b border-slate-200 pb-1">{subName}</div> {/* Updated subcategory styling */}
+                            <div className="text-sm font-semibold text-slate-600 mt-3 mb-1 pl-2 border-b border-slate-200 pb-1">{subName}</div>
                             {tests.map(renderTestItem)}
                         </div>
                     ))}
@@ -171,15 +169,6 @@ const TreeItem: React.FC<{
 
 const TestSelector: React.FC<TestSelectorProps> = ({ testData, onAddTest, onRemoveTest, currentBillItems, isDisabled = false }) => {
     const [searchTerm, setSearchTerm] = useState('');
-
-    const activeBillCategoryInfo = useMemo(() => {
-        if (currentBillItems.length === 0) {
-            return null;
-        }
-        const firstItem = currentBillItems[0];
-        const category = testData.find(cat => cat.tests.some(t => t.id === firstItem.id));
-        return category ? { name: category.category, isMajor: !!category.isMajor } : null;
-    }, [currentBillItems, testData]);
 
     return (
         <div className="bg-white p-6 rounded-xl shadow-lg space-y-4 h-full flex flex-col">
@@ -195,17 +184,6 @@ const TestSelector: React.FC<TestSelectorProps> = ({ testData, onAddTest, onRemo
             />
             <div className="space-y-1 overflow-y-auto pr-2 flex-grow">
                 {testData.map((category, index) => {
-                    let categoryIsDisabled = isDisabled;
-                    if (!categoryIsDisabled && activeBillCategoryInfo) {
-                        if (activeBillCategoryInfo.isMajor) {
-                            // If a major category item is selected, disable all other categories
-                            categoryIsDisabled = category.category !== activeBillCategoryInfo.name;
-                        } else {
-                            // If a standard item is selected, disable all major categories
-                            categoryIsDisabled = !!category.isMajor;
-                        }
-                    }
-
                     return (
                         <TreeItem 
                             key={category.category} 
@@ -215,7 +193,7 @@ const TestSelector: React.FC<TestSelectorProps> = ({ testData, onAddTest, onRemo
                             currentBillItems={currentBillItems}
                             searchTerm={searchTerm}
                             isInitiallyOpen={index < 3 && !searchTerm} // Only initially open first 3 if no search
-                            isDisabled={categoryIsDisabled}
+                            isDisabled={isDisabled}
                         />
                     );
                 })}
