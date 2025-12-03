@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { TestCategory, Test } from '../types';
 
 interface ManageTestsProps {
@@ -9,128 +9,219 @@ interface ManageTestsProps {
 }
 
 const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack }) => {
-    const [editingTest, setEditingTest] = useState<{ catIndex: number; testIndex: number; test: Test } | null>(null);
-    const [isCreatingTest, setIsCreatingTest] = useState<number | null>(null);
-    const [isQuickEditMode, setIsQuickEditMode] = useState(false);
+    // --- State ---
+    const [addingCategoryIndex, setAddingCategoryIndex] = useState<number | null>(null);
+    const [editingTestId, setEditingTestId] = useState<string | null>(null);
+    const [editForm, setEditForm] = useState<Test | null>(null);
+    
+    // Selection State
+    const [selectedTestIds, setSelectedTestIds] = useState<Set<string>>(new Set());
+    
+    // Bulk Edit Form State
+    const [bulkValues, setBulkValues] = useState({
+        price: '',
+        priceNight: '',
+        commissionDay: '',
+        commissionNight: ''
+    });
 
-    const handleCategoryChange = (index: number, newName: string) => {
+    // --- Helpers ---
+    const allTestIds = useMemo(() => {
+        const ids: string[] = [];
+        testData.forEach(cat => cat.tests.forEach(t => ids.push(t.id)));
+        return ids;
+    }, [testData]);
+
+    // --- Category Handlers ---
+    const handleCategoryNameChange = (index: number, newName: string) => {
         const newData = [...testData];
         newData[index].category = newName;
         setTestData(newData);
     };
 
     const handleAddCategory = () => {
-        const newCategoryName = prompt('Enter new category name:');
-        if (newCategoryName && newCategoryName.trim() !== '') {
-            setTestData([...testData, { category: newCategoryName.trim(), tests: [] }]);
+        const name = prompt('Enter new category name:');
+        if (name?.trim()) {
+            setTestData([...testData, { category: name.trim(), tests: [] }]);
         }
     };
-    
+
     const handleDeleteCategory = (index: number) => {
-        if (window.confirm(`Are you sure you want to delete the category "${testData[index].category}" and all its tests?`)) {
-            const newData = testData.filter((_, i) => i !== index);
-            setTestData(newData);
+        if (window.confirm(`Delete category "${testData[index].category}" and all its tests?`)) {
+            // Remove selected IDs if they belong to this category
+            const idsToRemove = testData[index].tests.map(t => t.id);
+            const newSelected = new Set(selectedTestIds);
+            idsToRemove.forEach(id => newSelected.delete(id));
+            setSelectedTestIds(newSelected);
+
+            setTestData(testData.filter((_, i) => i !== index));
         }
     };
 
-    const handleSaveTest = (catIndex: number, originalTestId: string | undefined, updatedTest: Test) => {
-        const newData = [...testData];
-        if (originalTestId) { 
-            const testIndex = newData[catIndex].tests.findIndex(t => t.id === originalTestId);
-            if (testIndex !== -1) {
-                newData[catIndex].tests[testIndex] = updatedTest;
-                alert('Test updated successfully!');
-            }
+    // --- Selection Handlers ---
+    const toggleTestSelection = (id: string) => {
+        const newSet = new Set(selectedTestIds);
+        if (newSet.has(id)) newSet.delete(id);
+        else newSet.add(id);
+        setSelectedTestIds(newSet);
+    };
+
+    const toggleCategorySelection = (catIndex: number) => {
+        const catTests = testData[catIndex].tests;
+        const allSelected = catTests.every(t => selectedTestIds.has(t.id));
+        
+        const newSet = new Set(selectedTestIds);
+        if (allSelected) {
+            catTests.forEach(t => newSet.delete(t.id));
         } else {
-            newData[catIndex].tests.push({ ...updatedTest, id: `custom-${Date.now()}` });
-            alert('Test added successfully!');
+            catTests.forEach(t => newSet.add(t.id));
         }
+        setSelectedTestIds(newSet);
+    };
+
+    const clearSelection = () => {
+        setSelectedTestIds(new Set());
+        setBulkValues({ price: '', priceNight: '', commissionDay: '', commissionNight: '' });
+    };
+
+    // --- Bulk Action Handlers ---
+    const handleBulkUpdate = () => {
+        if (selectedTestIds.size === 0) return;
+        if (!window.confirm(`Update ${selectedTestIds.size} selected tests with entered values? Empty fields will remain unchanged.`)) return;
+
+        const newData = testData.map(cat => ({
+            ...cat,
+            tests: cat.tests.map(t => {
+                if (selectedTestIds.has(t.id)) {
+                    return {
+                        ...t,
+                        price: bulkValues.price !== '' ? Number(bulkValues.price) : t.price,
+                        priceNight: bulkValues.priceNight !== '' ? Number(bulkValues.priceNight) : t.priceNight,
+                        commissionDay: bulkValues.commissionDay !== '' ? Number(bulkValues.commissionDay) : t.commissionDay,
+                        commissionNight: bulkValues.commissionNight !== '' ? Number(bulkValues.commissionNight) : t.commissionNight,
+                    };
+                }
+                return t;
+            })
+        }));
+
         setTestData(newData);
-        setEditingTest(null);
-        setIsCreatingTest(null);
-    };
-    
-    const handleDeleteTest = (catIndex: number, testIndex: number) => {
-        const testName = testData[catIndex].tests[testIndex].name;
-        if (window.confirm(`Are you sure you want to delete the test "${testName}"?`)) {
-             const newData = [...testData];
-            newData[catIndex].tests = newData[catIndex].tests.filter((_, i) => i !== testIndex);
-            setTestData(newData);
-        }
+        clearSelection();
     };
 
-    // Quick Update Handler for Inline Edits
-    const handleQuickUpdate = (catIndex: number, testIndex: number, field: keyof Test, value: number) => {
+    // --- Single Edit Handlers ---
+    const handleStartEdit = (test: Test) => {
+        // Prevent edit if we are selecting
+        if (selectedTestIds.size > 0) return; 
+        setEditingTestId(test.id);
+        setEditForm({ ...test });
+    };
+
+    const handleCancelEdit = () => {
+        setEditingTestId(null);
+        setEditForm(null);
+    };
+
+    const handleSaveEdit = (catIndex: number, testIndex: number) => {
+        if (!editForm || !editForm.name.trim()) return alert("Test name required");
+        
         const newData = [...testData];
-        // Use type assertion or check to ensure we are setting the right fields
-        if (field === 'price' || field === 'priceNight' || field === 'commissionDay' || field === 'commissionNight') {
-             newData[catIndex].tests[testIndex] = {
-                ...newData[catIndex].tests[testIndex],
-                [field]: value
-            };
+        newData[catIndex].tests[testIndex] = editForm;
+        setTestData(newData);
+        setEditingTestId(null);
+        setEditForm(null);
+    };
+
+    const handleInlineChange = (field: keyof Test, value: string | number) => {
+        if (!editForm) return;
+        setEditForm({ ...editForm, [field]: value });
+    };
+
+    const handleDeleteTest = (catIndex: number, testIndex: number) => {
+        if (window.confirm("Delete this test?")) {
+            const testId = testData[catIndex].tests[testIndex].id;
+            const newSelected = new Set(selectedTestIds);
+            newSelected.delete(testId);
+            setSelectedTestIds(newSelected);
+
+            const newData = [...testData];
+            newData[catIndex].tests.splice(testIndex, 1);
             setTestData(newData);
         }
     };
 
-    interface TestFormProps {
-        categoryIndex: number;
-        test?: Test;
-        onSave: (catIndex: number, originalTestId: string | undefined, updatedTest: Test) => void;
-        onCancel: () => void;
-    }
+    // --- New Test Handler ---
+    const handleSaveNewTest = (test: Test) => {
+        if (addingCategoryIndex === null) return;
+        const newData = [...testData];
+        newData[addingCategoryIndex].tests.push({ ...test, id: `custom-${Date.now()}` });
+        setTestData(newData);
+        setAddingCategoryIndex(null);
+    };
 
-    const TestForm: React.FC<TestFormProps> = ({ categoryIndex, test, onSave, onCancel }) => {
-        const [name, setName] = useState(test?.name || '');
-        const [price, setPrice] = useState(test?.price || 0);
-        const [priceNight, setPriceNight] = useState(test?.priceNight || 0);
-        const [subcategory, setSubcategory] = useState(test?.subcategory || '');
-        const [commissionDay, setCommissionDay] = useState(test?.commissionDay || 0);
-        const [commissionNight, setCommissionNight] = useState(test?.commissionNight || 0);
+    // --- Components ---
+    const AddTestModal = () => {
+        const [formData, setFormData] = useState<Partial<Test>>({ price: 0, priceNight: 0, commissionDay: 0, commissionNight: 0 });
 
         const handleSubmit = (e: React.FormEvent) => {
             e.preventDefault();
-            if (!name.trim() || price <= 0) {
-                alert('Test name and a positive price are required.');
-                return;
-            }
-            onSave(categoryIndex, test?.id, { ...test, name: name.trim(), price, priceNight, subcategory: subcategory.trim() || undefined, commissionDay, commissionNight } as Test);
+            if (!formData.name || !formData.price) return alert("Name and Price are required");
+            handleSaveNewTest(formData as Test);
         };
 
         return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-                <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto">
-                    <h3 className="text-xl font-bold border-b pb-2">{test ? 'Edit Test' : 'Add New Test'}</h3>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700">Test Name</label>
-                        <input type="text" value={name} onChange={e => setName(e.target.value)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" required />
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] backdrop-blur-sm p-4 animate-fade-in">
+                <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all scale-100">
+                    <div className="bg-[#143A78] px-6 py-4 flex justify-between items-center">
+                        <h3 className="text-white font-bold text-lg">Add New Test</h3>
+                        <button type="button" onClick={() => setAddingCategoryIndex(null)} className="text-white/80 hover:text-white transition-colors">
+                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="p-6 space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700">Day Price (₹)</label>
-                            <input type="number" value={price} onChange={e => setPrice(parseFloat(e.target.value) || 0)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" min="0" required />
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">Test Name</label>
+                            <input autoFocus type="text" className="w-full border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 p-2 text-sm" 
+                                value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} required placeholder="e.g. CBC" />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700">Night Price (₹)</label>
-                            <input type="number" value={priceNight} onChange={e => setPriceNight(parseFloat(e.target.value) || 0)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" min="0" />
+                         <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">Subcategory</label>
+                            <input type="text" className="w-full border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 p-2 text-sm" 
+                                value={formData.subcategory || ''} onChange={e => setFormData({...formData, subcategory: e.target.value})} placeholder="e.g. Biochemistry" />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Day Price (₹)</label>
+                                <input type="number" className="w-full border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 p-2 text-sm" 
+                                    value={formData.price} onChange={e => setFormData({...formData, price: parseFloat(e.target.value)||0})} min="0" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Night Price (₹)</label>
+                                <input type="number" className="w-full border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 p-2 text-sm" 
+                                    value={formData.priceNight} onChange={e => setFormData({...formData, priceNight: parseFloat(e.target.value)||0})} min="0" />
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                            <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Commissions</h4>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Day Shift</label>
+                                    <input type="number" className="w-full border-slate-300 rounded text-sm p-1.5" 
+                                        value={formData.commissionDay} onChange={e => setFormData({...formData, commissionDay: parseFloat(e.target.value)||0})} min="0" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Night Shift</label>
+                                    <input type="number" className="w-full border-slate-300 rounded text-sm p-1.5" 
+                                        value={formData.commissionNight} onChange={e => setFormData({...formData, commissionNight: parseFloat(e.target.value)||0})} min="0" />
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700">Subcategory (Optional)</label>
-                        <input type="text" value={subcategory} onChange={e => setSubcategory(e.target.value)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 bg-slate-50 p-2 rounded">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700">Comm. Day (₹)</label>
-                            <input type="number" value={commissionDay} onChange={e => setCommissionDay(parseFloat(e.target.value) || 0)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" min="0" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700">Comm. Night (₹)</label>
-                            <input type="number" value={commissionNight} onChange={e => setCommissionNight(parseFloat(e.target.value) || 0)} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm" min="0" />
-                        </div>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-2">
-                        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200">Cancel</button>
-                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-[#143A78] rounded-lg hover:bg-blue-900">Save Test</button>
+                    <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-100">
+                        <button type="button" onClick={() => setAddingCategoryIndex(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg font-medium text-sm">Cancel</button>
+                        <button type="submit" className="px-4 py-2 bg-[#143A78] text-white hover:bg-blue-900 rounded-lg font-medium text-sm shadow-sm">Save Test</button>
                     </div>
                 </form>
             </div>
@@ -138,135 +229,217 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
     };
 
     return (
-        <div className="space-y-6">
-            {(editingTest || isCreatingTest !== null) && (
-                <TestForm 
-                    categoryIndex={editingTest?.catIndex ?? isCreatingTest!}
-                    test={editingTest?.test}
-                    onSave={handleSaveTest}
-                    onCancel={() => { setEditingTest(null); setIsCreatingTest(null); }}
-                />
-            )}
-            <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-bold text-slate-800">Manage Tests</h2>
-                <div className="flex gap-2">
-                    <button 
-                        onClick={() => setIsQuickEditMode(!isQuickEditMode)} 
-                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${isQuickEditMode ? 'bg-orange-100 text-orange-800 border-orange-300' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
-                    >
-                        {isQuickEditMode ? (
-                            <>
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                                Done Editing
-                            </>
-                        ) : (
-                            <>
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                Quick Price Edit
-                            </>
-                        )}
+        <div className="space-y-6 pb-24 relative max-w-7xl mx-auto">
+            {addingCategoryIndex !== null && <AddTestModal />}
+
+            {/* Header */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div>
+                    <h2 className="text-3xl font-bold text-slate-800">Manage Tests</h2>
+                    <p className="text-slate-500 text-sm mt-1">
+                        Select multiple items to bulk edit prices, or click any row to edit individually.
+                    </p>
+                </div>
+                <div className="flex gap-3">
+                    <button onClick={handleAddCategory} className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold shadow-sm text-sm flex items-center gap-2">
+                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                        New Category
                     </button>
-                    <button onClick={onBack} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                    <button onClick={onBack} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-semibold shadow-sm text-sm border border-slate-200">
                         Back
                     </button>
                 </div>
             </div>
-            
-            <div className="bg-white p-6 rounded-xl shadow-lg space-y-4">
-                 <div className="flex justify-end">
-                    <button onClick={handleAddCategory} className="px-4 py-2 text-sm font-medium text-white bg-[#143A78] rounded-lg hover:bg-blue-900">Add New Category</button>
-                </div>
 
-                <div className="space-y-6">
-                    {testData.map((category, catIndex) => (
-                        <div key={catIndex} className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-                            <div className="flex justify-between items-center mb-3">
-                                <input 
-                                    type="text"
-                                    value={category.category}
-                                    onChange={(e) => handleCategoryChange(catIndex, e.target.value)}
-                                    className="text-lg font-bold text-slate-800 bg-transparent border-b-2 border-transparent focus:border-blue-500 outline-none"
-                                />
-                                <button onClick={() => handleDeleteCategory(catIndex)} className="text-red-500 hover:text-red-700 text-sm font-medium">Delete Category</button>
-                            </div>
-                            <div className="bg-white rounded border border-slate-200 overflow-hidden">
-                                <div className="grid grid-cols-6 gap-2 p-2 bg-slate-100 text-xs font-bold text-slate-600 uppercase tracking-wide">
-                                    <span className="col-span-2">Test Name</span>
-                                    <span>Price (D / N)</span>
-                                    <span>Subcategory</span>
-                                    <span>Comm. (D / N)</span>
-                                    <span className="text-right">Actions</span>
+            {/* Categories */}
+            <div className="space-y-6">
+                {testData.map((category, catIndex) => {
+                    const isAllCatSelected = category.tests.length > 0 && category.tests.every(t => selectedTestIds.has(t.id));
+                    
+                    return (
+                        <div key={catIndex} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                            {/* Category Header */}
+                            <div className="bg-slate-50 px-6 py-3 flex justify-between items-center border-b border-slate-200">
+                                <div className="flex items-center gap-4">
+                                     <input 
+                                        type="checkbox" 
+                                        checked={isAllCatSelected}
+                                        onChange={() => toggleCategorySelection(catIndex)}
+                                        className="h-5 w-5 rounded border-slate-300 text-[#143A78] focus:ring-[#143A78] cursor-pointer"
+                                        title="Select all in category"
+                                     />
+                                    <input 
+                                        type="text"
+                                        className="text-lg font-bold text-slate-800 bg-transparent border-none focus:ring-0 px-0 py-1 cursor-text w-full hover:bg-white hover:px-2 transition-all rounded"
+                                        value={category.category}
+                                        onChange={(e) => handleCategoryNameChange(catIndex, e.target.value)}
+                                        placeholder="Category Name"
+                                    />
                                 </div>
-                                {category.tests.map((test, testIndex) => (
-                                    <div key={test.id} className="grid grid-cols-6 gap-2 p-2 border-t border-slate-100 items-center hover:bg-slate-50">
-                                        <span className="col-span-2 text-sm font-medium text-slate-800">{test.name}</span>
-                                        
-                                        {/* Price Column */}
-                                        {isQuickEditMode ? (
-                                            <div className="flex flex-col gap-1">
-                                                <input 
-                                                    type="number" 
-                                                    className="w-full text-xs p-1 border rounded focus:ring-1 focus:ring-blue-500" 
-                                                    value={test.price} 
-                                                    onChange={(e) => handleQuickUpdate(catIndex, testIndex, 'price', parseFloat(e.target.value) || 0)}
-                                                    placeholder="Day"
-                                                />
-                                                <input 
-                                                    type="number" 
-                                                    className="w-full text-xs p-1 border rounded bg-indigo-50 focus:ring-1 focus:ring-indigo-500" 
-                                                    value={test.priceNight || 0} 
-                                                    onChange={(e) => handleQuickUpdate(catIndex, testIndex, 'priceNight', parseFloat(e.target.value) || 0)}
-                                                    placeholder="Night"
-                                                />
-                                            </div>
-                                        ) : (
-                                            <span className="text-sm">₹{test.price} / <span className="text-indigo-600">₹{test.priceNight || test.price}</span></span>
-                                        )}
-
-                                        <span className="text-sm text-slate-500 truncate">{test.subcategory || '-'}</span>
-                                        
-                                        {/* Commission Column */}
-                                        {isQuickEditMode ? (
-                                            <div className="flex flex-col gap-1">
-                                                <input 
-                                                    type="number" 
-                                                    className="w-full text-xs p-1 border rounded focus:ring-1 focus:ring-blue-500" 
-                                                    value={test.commissionDay || 0} 
-                                                    onChange={(e) => handleQuickUpdate(catIndex, testIndex, 'commissionDay', parseFloat(e.target.value) || 0)}
-                                                    placeholder="Day"
-                                                />
-                                                <input 
-                                                    type="number" 
-                                                    className="w-full text-xs p-1 border rounded bg-indigo-50 focus:ring-1 focus:ring-indigo-500" 
-                                                    value={test.commissionNight || 0} 
-                                                    onChange={(e) => handleQuickUpdate(catIndex, testIndex, 'commissionNight', parseFloat(e.target.value) || 0)}
-                                                    placeholder="Night"
-                                                />
-                                            </div>
-                                        ) : (
-                                            <span className="text-sm">₹{test.commissionDay} / <span className="text-indigo-600">₹{test.commissionNight}</span></span>
-                                        )}
-
-                                        <div className="flex justify-end gap-3">
-                                            {!isQuickEditMode && (
-                                                <button onClick={() => setEditingTest({ catIndex, testIndex, test })} className="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</button>
-                                            )}
-                                            <button onClick={() => handleDeleteTest(catIndex, testIndex)} className="text-red-500 hover:text-red-700 text-sm font-medium">Delete</button>
-                                        </div>
-                                    </div>
-                                ))}
-                                <div className="p-2 border-t border-slate-100 bg-slate-50">
-                                    <button onClick={() => setIsCreatingTest(catIndex)} className="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                                        Add Test
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => setAddingCategoryIndex(catIndex)} className="text-xs font-semibold text-blue-600 bg-blue-50 px-3 py-1.5 rounded hover:bg-blue-100">
+                                        + Add Test
+                                    </button>
+                                    <button onClick={() => handleDeleteCategory(catIndex)} className="text-xs font-semibold text-red-600 bg-red-50 px-3 py-1.5 rounded hover:bg-red-100">
+                                        Delete
                                     </button>
                                 </div>
                             </div>
+
+                            {/* Tests Table */}
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-slate-100">
+                                    <thead className="bg-white text-xs font-semibold text-slate-500 uppercase">
+                                        <tr>
+                                            <th className="w-12 px-6 py-3 text-center">
+                                                {/* Checkbox Col */}
+                                            </th>
+                                            <th className="px-6 py-3 text-left w-[30%]">Test Name</th>
+                                            <th className="px-6 py-3 text-left w-[15%]">Subcategory</th>
+                                            <th className="px-6 py-3 text-left w-[20%]">Price (Day/Night)</th>
+                                            <th className="px-6 py-3 text-left w-[20%]">Comm (Day/Night)</th>
+                                            <th className="px-6 py-3 text-right"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {category.tests.length === 0 && (
+                                            <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-400 text-sm italic">No tests in this category.</td></tr>
+                                        )}
+                                        {category.tests.map((test, testIndex) => {
+                                            const isEditing = editingTestId === test.id;
+                                            const isSelected = selectedTestIds.has(test.id);
+
+                                            return (
+                                                <tr key={test.id} className={`group transition-colors ${isEditing ? 'bg-blue-50' : isSelected ? 'bg-indigo-50/50' : 'hover:bg-slate-50'}`}>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={isSelected}
+                                                            onChange={() => toggleTestSelection(test.id)}
+                                                            className="h-4 w-4 rounded border-slate-300 text-[#143A78] focus:ring-[#143A78] cursor-pointer"
+                                                        />
+                                                    </td>
+
+                                                    {isEditing ? (
+                                                        // --- EDIT MODE ---
+                                                        <>
+                                                            <td className="px-4 py-3 align-top">
+                                                                <input type="text" className="w-full text-sm border-blue-400 rounded focus:ring-1 focus:ring-blue-500 shadow-sm" 
+                                                                    value={editForm?.name} onChange={e => handleInlineChange('name', e.target.value)} autoFocus />
+                                                            </td>
+                                                            <td className="px-4 py-3 align-top">
+                                                                <input type="text" className="w-full text-sm border-slate-300 rounded focus:ring-blue-500 shadow-sm" 
+                                                                    value={editForm?.subcategory || ''} onChange={e => handleInlineChange('subcategory', e.target.value)} />
+                                                            </td>
+                                                            <td className="px-4 py-3 align-top">
+                                                                <div className="flex gap-2">
+                                                                    <input type="number" placeholder="D" className="w-1/2 text-sm border-slate-300 rounded focus:ring-blue-500" 
+                                                                        value={editForm?.price} onChange={e => handleInlineChange('price', parseFloat(e.target.value)||0)} />
+                                                                    <input type="number" placeholder="N" className="w-1/2 text-sm border-slate-300 rounded focus:ring-blue-500 bg-indigo-50" 
+                                                                        value={editForm?.priceNight} onChange={e => handleInlineChange('priceNight', parseFloat(e.target.value)||0)} />
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-3 align-top">
+                                                                <div className="flex gap-2">
+                                                                    <input type="number" placeholder="D" className="w-1/2 text-sm border-slate-300 rounded focus:ring-blue-500" 
+                                                                        value={editForm?.commissionDay} onChange={e => handleInlineChange('commissionDay', parseFloat(e.target.value)||0)} />
+                                                                    <input type="number" placeholder="N" className="w-1/2 text-sm border-slate-300 rounded focus:ring-blue-500 bg-indigo-50" 
+                                                                        value={editForm?.commissionNight} onChange={e => handleInlineChange('commissionNight', parseFloat(e.target.value)||0)} />
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-3 align-middle text-right">
+                                                                <div className="flex justify-end gap-2">
+                                                                    <button onClick={() => handleSaveEdit(catIndex, testIndex)} className="p-1.5 bg-green-600 text-white rounded hover:bg-green-700">
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                                                    </button>
+                                                                    <button onClick={handleCancelEdit} className="p-1.5 bg-white border border-slate-300 text-slate-600 rounded hover:bg-slate-100">
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </>
+                                                    ) : (
+                                                        // --- VIEW MODE ---
+                                                        // Clicking any cell triggers edit, unless user is selecting text
+                                                        <>
+                                                            <td className="px-6 py-4 cursor-pointer" onClick={() => handleStartEdit(test)}>
+                                                                <span className="text-sm font-medium text-slate-700">{test.name}</span>
+                                                            </td>
+                                                            <td className="px-6 py-4 cursor-pointer" onClick={() => handleStartEdit(test)}>
+                                                                <span className="text-sm text-slate-500">{test.subcategory || '-'}</span>
+                                                            </td>
+                                                            <td className="px-6 py-4 cursor-pointer" onClick={() => handleStartEdit(test)}>
+                                                                <div className="text-sm">
+                                                                    <span className="font-semibold text-slate-700">₹{test.price}</span>
+                                                                    {test.priceNight ? <span className="text-xs text-indigo-600 ml-1 bg-indigo-50 px-1 rounded">N: {test.priceNight}</span> : null}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 cursor-pointer" onClick={() => handleStartEdit(test)}>
+                                                                <div className="text-sm text-slate-500">
+                                                                    <span>{test.commissionDay || 0}</span>
+                                                                    <span className="mx-1">/</span>
+                                                                    <span className={test.commissionNight ? 'text-indigo-600' : ''}>{test.commissionNight || 0}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right">
+                                                                <button onClick={() => handleDeleteTest(catIndex, testIndex)} className="text-slate-300 hover:text-red-500 transition-colors p-1" title="Delete">
+                                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                                </button>
+                                                            </td>
+                                                        </>
+                                                    )}
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    ))}
-                </div>
+                    );
+                })}
             </div>
+
+            {/* Sticky Bulk Action Bar */}
+            {selectedTestIds.size > 0 && (
+                <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-[90%] max-w-5xl z-50 animate-slide-up">
+                    <div className="bg-slate-800 text-white rounded-xl shadow-2xl p-4 flex flex-col md:flex-row items-center gap-4 border border-slate-700">
+                        <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start border-b md:border-b-0 border-slate-700 pb-2 md:pb-0">
+                            <span className="font-bold whitespace-nowrap text-lg text-white">{selectedTestIds.size} Selected</span>
+                            <button onClick={clearSelection} className="text-xs text-slate-400 hover:text-white underline">Cancel</button>
+                        </div>
+                        
+                        <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 w-full">
+                            <input 
+                                type="number" placeholder="Set Day Price" 
+                                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 rounded text-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                                value={bulkValues.price} onChange={e => setBulkValues({...bulkValues, price: e.target.value})}
+                            />
+                            <input 
+                                type="number" placeholder="Set Night Price" 
+                                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 rounded text-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                                value={bulkValues.priceNight} onChange={e => setBulkValues({...bulkValues, priceNight: e.target.value})}
+                            />
+                            <input 
+                                type="number" placeholder="Set Day Comm" 
+                                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 rounded text-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                                value={bulkValues.commissionDay} onChange={e => setBulkValues({...bulkValues, commissionDay: e.target.value})}
+                            />
+                            <input 
+                                type="number" placeholder="Set Night Comm" 
+                                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 rounded text-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                                value={bulkValues.commissionNight} onChange={e => setBulkValues({...bulkValues, commissionNight: e.target.value})}
+                            />
+                        </div>
+
+                        <button 
+                            onClick={handleBulkUpdate}
+                            className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-bold shadow-lg transition-transform transform active:scale-95"
+                        >
+                            Update
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
