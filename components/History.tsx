@@ -7,11 +7,12 @@ interface HistoryProps {
     onViewBill: (bill: SavedBill) => void;
     onVoidBill: (billNumber: number, reason: string) => void;
     onRequestCancellation: (billNumber: number, reason: string) => void;
+    onRequestModification: (billNumber: number, reason: string) => void;
     onVerifyBill: (billNumber: number, isApproved: boolean, reason?: string) => void;
     currentUser: User;
 }
 
-const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, onRequestCancellation, onVerifyBill, currentUser }) => {
+const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, onRequestCancellation, onRequestModification, onVerifyBill, currentUser }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showVoided, setShowVoided] = useState(false);
 
@@ -34,6 +35,15 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, o
             onRequestCancellation(bill.billNumber, reason.trim());
         } else if (reason !== null) {
             alert('A reason is required to request cancellation.');
+        }
+    };
+
+    const handleRequestModifyClick = (bill: SavedBill) => {
+        const reason = prompt(`Please provide a reason for requesting modification on Bill #${String(bill.billNumber).padStart(6, '0')}:`);
+        if (reason && reason.trim()) {
+            onRequestModification(bill.billNumber, reason.trim());
+        } else if (reason !== null) {
+            alert('A reason is required to request modification.');
         }
     };
 
@@ -209,6 +219,18 @@ const History: React.FC<HistoryProps> = ({ savedBills, onViewBill, onVoidBill, o
                                                 {/* Pending Cancel Status */}
                                                 {bill.cancellationRequest?.status === 'pending' && (
                                                     <span className="text-xs text-orange-600 font-semibold ml-2 block sm:inline">Cancel Requested</span>
+                                                )}
+
+                                                {/* User Actions - Request Modification */}
+                                                {currentUser.role !== 'admin' && bill.status !== 'voided' && !bill.modificationRequest && (
+                                                    <button onClick={() => handleRequestModifyClick(bill)} className="text-blue-600 hover:text-blue-800 ml-2">
+                                                        Req. Modify
+                                                    </button>
+                                                )}
+
+                                                {/* Pending Modify Status */}
+                                                {bill.modificationRequest?.status === 'pending' && (
+                                                    <span className="text-xs text-blue-600 font-semibold ml-2 block sm:inline">Modify Requested</span>
                                                 )}
                                             </>
                                         )}

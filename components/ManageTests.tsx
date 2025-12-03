@@ -11,6 +11,7 @@ interface ManageTestsProps {
 const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack }) => {
     const [editingTest, setEditingTest] = useState<{ catIndex: number; testIndex: number; test: Test } | null>(null);
     const [isCreatingTest, setIsCreatingTest] = useState<number | null>(null);
+    const [isQuickEditMode, setIsQuickEditMode] = useState(false);
 
     const handleCategoryChange = (index: number, newName: string) => {
         const newData = [...testData];
@@ -54,6 +55,19 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
         if (window.confirm(`Are you sure you want to delete the test "${testName}"?`)) {
              const newData = [...testData];
             newData[catIndex].tests = newData[catIndex].tests.filter((_, i) => i !== testIndex);
+            setTestData(newData);
+        }
+    };
+
+    // Quick Update Handler for Inline Edits
+    const handleQuickUpdate = (catIndex: number, testIndex: number, field: keyof Test, value: number) => {
+        const newData = [...testData];
+        // Use type assertion or check to ensure we are setting the right fields
+        if (field === 'price' || field === 'priceNight' || field === 'commissionDay' || field === 'commissionNight') {
+             newData[catIndex].tests[testIndex] = {
+                ...newData[catIndex].tests[testIndex],
+                [field]: value
+            };
             setTestData(newData);
         }
     };
@@ -135,10 +149,28 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
             )}
             <div className="flex justify-between items-center">
                 <h2 className="text-3xl font-bold text-slate-800">Manage Tests</h2>
-                <button onClick={onBack} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-                    Back to Dashboard
-                </button>
+                <div className="flex gap-2">
+                    <button 
+                        onClick={() => setIsQuickEditMode(!isQuickEditMode)} 
+                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${isQuickEditMode ? 'bg-orange-100 text-orange-800 border-orange-300' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
+                    >
+                        {isQuickEditMode ? (
+                            <>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                Done Editing
+                            </>
+                        ) : (
+                            <>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                Quick Price Edit
+                            </>
+                        )}
+                    </button>
+                    <button onClick={onBack} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                        Back
+                    </button>
+                </div>
             </div>
             
             <div className="bg-white p-6 rounded-xl shadow-lg space-y-4">
@@ -161,19 +193,65 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
                             <div className="bg-white rounded border border-slate-200 overflow-hidden">
                                 <div className="grid grid-cols-6 gap-2 p-2 bg-slate-100 text-xs font-bold text-slate-600 uppercase tracking-wide">
                                     <span className="col-span-2">Test Name</span>
-                                    <span>Price (D/N)</span>
+                                    <span>Price (D / N)</span>
                                     <span>Subcategory</span>
-                                    <span>Comm. (D/N)</span>
+                                    <span>Comm. (D / N)</span>
                                     <span className="text-right">Actions</span>
                                 </div>
                                 {category.tests.map((test, testIndex) => (
                                     <div key={test.id} className="grid grid-cols-6 gap-2 p-2 border-t border-slate-100 items-center hover:bg-slate-50">
                                         <span className="col-span-2 text-sm font-medium text-slate-800">{test.name}</span>
-                                        <span className="text-sm">₹{test.price} / <span className="text-indigo-600">₹{test.priceNight || test.price}</span></span>
+                                        
+                                        {/* Price Column */}
+                                        {isQuickEditMode ? (
+                                            <div className="flex flex-col gap-1">
+                                                <input 
+                                                    type="number" 
+                                                    className="w-full text-xs p-1 border rounded focus:ring-1 focus:ring-blue-500" 
+                                                    value={test.price} 
+                                                    onChange={(e) => handleQuickUpdate(catIndex, testIndex, 'price', parseFloat(e.target.value) || 0)}
+                                                    placeholder="Day"
+                                                />
+                                                <input 
+                                                    type="number" 
+                                                    className="w-full text-xs p-1 border rounded bg-indigo-50 focus:ring-1 focus:ring-indigo-500" 
+                                                    value={test.priceNight || 0} 
+                                                    onChange={(e) => handleQuickUpdate(catIndex, testIndex, 'priceNight', parseFloat(e.target.value) || 0)}
+                                                    placeholder="Night"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <span className="text-sm">₹{test.price} / <span className="text-indigo-600">₹{test.priceNight || test.price}</span></span>
+                                        )}
+
                                         <span className="text-sm text-slate-500 truncate">{test.subcategory || '-'}</span>
-                                        <span className="text-sm">₹{test.commissionDay} / <span className="text-indigo-600">₹{test.commissionNight}</span></span>
+                                        
+                                        {/* Commission Column */}
+                                        {isQuickEditMode ? (
+                                            <div className="flex flex-col gap-1">
+                                                <input 
+                                                    type="number" 
+                                                    className="w-full text-xs p-1 border rounded focus:ring-1 focus:ring-blue-500" 
+                                                    value={test.commissionDay || 0} 
+                                                    onChange={(e) => handleQuickUpdate(catIndex, testIndex, 'commissionDay', parseFloat(e.target.value) || 0)}
+                                                    placeholder="Day"
+                                                />
+                                                <input 
+                                                    type="number" 
+                                                    className="w-full text-xs p-1 border rounded bg-indigo-50 focus:ring-1 focus:ring-indigo-500" 
+                                                    value={test.commissionNight || 0} 
+                                                    onChange={(e) => handleQuickUpdate(catIndex, testIndex, 'commissionNight', parseFloat(e.target.value) || 0)}
+                                                    placeholder="Night"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <span className="text-sm">₹{test.commissionDay} / <span className="text-indigo-600">₹{test.commissionNight}</span></span>
+                                        )}
+
                                         <div className="flex justify-end gap-3">
-                                            <button onClick={() => setEditingTest({ catIndex, testIndex, test })} className="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</button>
+                                            {!isQuickEditMode && (
+                                                <button onClick={() => setEditingTest({ catIndex, testIndex, test })} className="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</button>
+                                            )}
                                             <button onClick={() => handleDeleteTest(catIndex, testIndex)} className="text-red-500 hover:text-red-700 text-sm font-medium">Delete</button>
                                         </div>
                                     </div>

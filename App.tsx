@@ -488,6 +488,26 @@ const App: React.FC = () => {
         logAction('CANCELLATION_REQUESTED', `Cancellation requested for Bill #${billNumberToCancel}.`);
     }, [currentUser, logAction]);
 
+    const handleRequestModification = useCallback((billNumberToModify: number, reason: string) => {
+        if (!currentUser) return;
+        setSavedBills(prevBills => 
+            prevBills.map(bill => 
+                bill.billNumber === billNumberToModify 
+                ? { 
+                    ...bill, 
+                    modificationRequest: {
+                        requestedBy: currentUser.username,
+                        requestedAt: new Date().toISOString(),
+                        reason,
+                        status: 'pending'
+                    }
+                  }
+                : bill
+            )
+        );
+        logAction('MODIFICATION_REQUESTED', `Modification requested for Bill #${billNumberToModify}.`);
+    }, [currentUser, logAction]);
+
     const handleVerifyBill = useCallback((billNumberToVerify: number, isApproved: boolean, reason?: string) => {
         if (!currentUser || currentUser.role !== 'admin') return;
 
@@ -583,7 +603,7 @@ const App: React.FC = () => {
                     </div>
                  )}
                  {viewMode === 'history' && (
-                     <History savedBills={savedBills} onViewBill={handleViewArchivedBill} onVoidBill={handleVoidBill} onRequestCancellation={handleRequestCancellation} onVerifyBill={handleVerifyBill} currentUser={currentUser} />
+                     <History savedBills={savedBills} onViewBill={handleViewArchivedBill} onVoidBill={handleVoidBill} onRequestCancellation={handleRequestCancellation} onRequestModification={handleRequestModification} onVerifyBill={handleVerifyBill} currentUser={currentUser} />
                  )}
                  {viewMode === 'dashboard' && currentUser.role === 'admin' && (
                      <>

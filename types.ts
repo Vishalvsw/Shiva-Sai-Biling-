@@ -67,6 +67,12 @@ export interface SavedBill {
         reason: string;
         status: 'pending' | 'approved' | 'rejected';
     };
+    modificationRequest?: {
+        requestedBy: string;
+        requestedAt: string;
+        reason: string;
+        status: 'pending' | 'resolved' | 'rejected';
+    };
     billType: 'Standard' | 'Department';
     department?: string;
     lastModifiedAt?: string;

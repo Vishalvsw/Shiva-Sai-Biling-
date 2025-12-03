@@ -61,7 +61,7 @@ const Bill: React.FC<BillProps> = ({
     const [isEditModeActive, setIsEditModeActive] = useState(false);
 
     // Recalculate totals using the passed utility function
-    const { subtotal, totalDiscountAmount, billDiscountAmount, total, totalCommissionAmount } = useMemo(() => { 
+    const { subtotal, totalDiscountAmount, billDiscountAmount, total } = useMemo(() => { 
         return calculateBillTotals(items, totalDiscount, patientDetails.refdBy);
     }, [items, totalDiscount, patientDetails.refdBy, calculateBillTotals]);
 
@@ -272,13 +272,6 @@ const Bill: React.FC<BillProps> = ({
                                 ))}
                             </select>
                         </div>
-                        {/* Display commission amount if a doctor is referred and if it's not zero */}
-                        {patientDetails.refdBy.trim() !== '' && totalCommissionAmount > 0 && (
-                            <div className="sm:col-span-4 md:col-span-2">
-                                <label className="block text-sm font-medium text-slate-700">Commission Amount</label>
-                                <p className="mt-1 block w-full text-sm text-slate-600">₹{totalCommissionAmount.toFixed(2)}</p>
-                            </div>
-                        )}
                     </div>
                      {/* Print View: Patient Details Text */}
                     <div className="hidden print:block border border-black p-3 my-4 text-sm">
@@ -288,9 +281,6 @@ const Bill: React.FC<BillProps> = ({
                             <p><strong className="font-semibold text-slate-800">Patient Name:</strong> {patientDetails.name}</p>
                             <p><strong className="font-semibold text-slate-800">Age / Sex:</strong> {patientDetails.age} / {patientDetails.sex}</p>
                             <p><strong className="font-semibold text-slate-800">Referred by Dr.:</strong> {patientDetails.refdBy || 'N/A'}</p>
-                            {patientDetails.refdBy.trim() !== '' && totalCommissionAmount > 0 && (
-                                <p><strong className="font-semibold text-slate-800">Commission:</strong> ₹{totalCommissionAmount.toFixed(2)}</p>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -572,9 +562,6 @@ const Bill: React.FC<BillProps> = ({
                     <p className="col-span-2">Patient: {patientDetails.name}</p>
                     <p>Age/Sex: {patientDetails.age}/{patientDetails.sex}</p>
                     <p>Refd By: {patientDetails.refdBy || 'N/A'}</p>
-                    {patientDetails.refdBy.trim() !== '' && totalCommissionAmount > 0 && (
-                        <p className="col-span-2">Commission: ₹{totalCommissionAmount.toFixed(2)}</p>
-                    )}
                 </div>
 
                 <div className="text-xs my-2">
