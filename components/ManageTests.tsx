@@ -60,6 +60,12 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
 
     // --- Selection Handlers ---
     const toggleTestSelection = (id: string) => {
+        // If editing, stop editing when selecting
+        if (editingTestId) {
+            setEditingTestId(null);
+            setEditForm(null);
+        }
+        
         const newSet = new Set(selectedTestIds);
         if (newSet.has(id)) newSet.delete(id);
         else newSet.add(id);
@@ -67,6 +73,12 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
     };
 
     const toggleCategorySelection = (catIndex: number) => {
+        // If editing, stop editing when selecting
+        if (editingTestId) {
+            setEditingTestId(null);
+            setEditForm(null);
+        }
+
         const catTests = testData[catIndex].tests;
         const allSelected = catTests.every(t => selectedTestIds.has(t.id));
         
@@ -110,7 +122,8 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
     };
 
     // --- Single Edit Handlers ---
-    const handleStartEdit = (test: Test) => {
+    const handleStartEdit = (test: Test, e?: React.MouseEvent) => {
+        e?.stopPropagation(); // Prevent row click if button clicked
         // Prevent edit if we are selecting
         if (selectedTestIds.size > 0) return; 
         setEditingTestId(test.id);
@@ -137,7 +150,8 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
         setEditForm({ ...editForm, [field]: value });
     };
 
-    const handleDeleteTest = (catIndex: number, testIndex: number) => {
+    const handleDeleteTest = (catIndex: number, testIndex: number, e?: React.MouseEvent) => {
+        e?.stopPropagation();
         if (window.confirm("Delete this test?")) {
             const testId = testData[catIndex].tests[testIndex].id;
             const newSelected = new Set(selectedTestIds);
@@ -170,7 +184,7 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
         };
 
         return (
-            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] backdrop-blur-sm p-4 animate-fade-in">
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] backdrop-blur-sm p-4 transition-opacity duration-300">
                 <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all scale-100">
                     <div className="bg-[#143A78] px-6 py-4 flex justify-between items-center">
                         <h3 className="text-white font-bold text-lg">Add New Test</h3>
@@ -237,7 +251,7 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
                 <div>
                     <h2 className="text-3xl font-bold text-slate-800">Manage Tests</h2>
                     <p className="text-slate-500 text-sm mt-1">
-                        Select multiple items to bulk edit prices, or click any row to edit individually.
+                        Select multiple items to bulk edit prices, or click the <span className="inline-block bg-blue-50 text-blue-600 px-1 py-0.5 rounded text-xs font-bold">✎</span> icon to edit individually.
                     </p>
                 </div>
                 <div className="flex gap-3">
@@ -298,7 +312,7 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
                                             <th className="px-6 py-3 text-left w-[15%]">Subcategory</th>
                                             <th className="px-6 py-3 text-left w-[20%]">Price (Day/Night)</th>
                                             <th className="px-6 py-3 text-left w-[20%]">Comm (Day/Night)</th>
-                                            <th className="px-6 py-3 text-right"></th>
+                                            <th className="px-6 py-3 text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -349,10 +363,10 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
                                                             </td>
                                                             <td className="px-6 py-3 align-middle text-right">
                                                                 <div className="flex justify-end gap-2">
-                                                                    <button onClick={() => handleSaveEdit(catIndex, testIndex)} className="p-1.5 bg-green-600 text-white rounded hover:bg-green-700">
+                                                                    <button onClick={() => handleSaveEdit(catIndex, testIndex)} className="p-1.5 bg-green-600 text-white rounded hover:bg-green-700" title="Save">
                                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                                                                     </button>
-                                                                    <button onClick={handleCancelEdit} className="p-1.5 bg-white border border-slate-300 text-slate-600 rounded hover:bg-slate-100">
+                                                                    <button onClick={handleCancelEdit} className="p-1.5 bg-white border border-slate-300 text-slate-600 rounded hover:bg-slate-100" title="Cancel">
                                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                                                     </button>
                                                                 </div>
@@ -360,29 +374,33 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
                                                         </>
                                                     ) : (
                                                         // --- VIEW MODE ---
-                                                        // Clicking any cell triggers edit, unless user is selecting text
                                                         <>
-                                                            <td className="px-6 py-4 cursor-pointer" onClick={() => handleStartEdit(test)}>
+                                                            <td className="px-6 py-4 cursor-pointer" onClick={(e) => handleStartEdit(test, e)}>
                                                                 <span className="text-sm font-medium text-slate-700">{test.name}</span>
                                                             </td>
-                                                            <td className="px-6 py-4 cursor-pointer" onClick={() => handleStartEdit(test)}>
+                                                            <td className="px-6 py-4 cursor-pointer" onClick={(e) => handleStartEdit(test, e)}>
                                                                 <span className="text-sm text-slate-500">{test.subcategory || '-'}</span>
                                                             </td>
-                                                            <td className="px-6 py-4 cursor-pointer" onClick={() => handleStartEdit(test)}>
+                                                            <td className="px-6 py-4 cursor-pointer" onClick={(e) => handleStartEdit(test, e)}>
                                                                 <div className="text-sm">
                                                                     <span className="font-semibold text-slate-700">₹{test.price}</span>
                                                                     {test.priceNight ? <span className="text-xs text-indigo-600 ml-1 bg-indigo-50 px-1 rounded">N: {test.priceNight}</span> : null}
                                                                 </div>
                                                             </td>
-                                                            <td className="px-6 py-4 cursor-pointer" onClick={() => handleStartEdit(test)}>
+                                                            <td className="px-6 py-4 cursor-pointer" onClick={(e) => handleStartEdit(test, e)}>
                                                                 <div className="text-sm text-slate-500">
                                                                     <span>{test.commissionDay || 0}</span>
                                                                     <span className="mx-1">/</span>
                                                                     <span className={test.commissionNight ? 'text-indigo-600' : ''}>{test.commissionNight || 0}</span>
                                                                 </div>
                                                             </td>
-                                                            <td className="px-6 py-4 text-right">
-                                                                <button onClick={() => handleDeleteTest(catIndex, testIndex)} className="text-slate-300 hover:text-red-500 transition-colors p-1" title="Delete">
+                                                            <td className="px-6 py-4 text-right whitespace-nowrap">
+                                                                 <button onClick={(e) => handleStartEdit(test, e)} className="text-slate-400 hover:text-blue-600 transition-colors p-1 mr-2" title="Edit">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                                    </svg>
+                                                                </button>
+                                                                <button onClick={(e) => handleDeleteTest(catIndex, testIndex, e)} className="text-slate-400 hover:text-red-500 transition-colors p-1" title="Delete">
                                                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                                                 </button>
                                                             </td>
@@ -401,41 +419,56 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, onBack
 
             {/* Sticky Bulk Action Bar */}
             {selectedTestIds.size > 0 && (
-                <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-[90%] max-w-5xl z-50 animate-slide-up">
-                    <div className="bg-slate-800 text-white rounded-xl shadow-2xl p-4 flex flex-col md:flex-row items-center gap-4 border border-slate-700">
+                <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-[95%] max-w-5xl z-50 transition-all duration-500 ease-in-out">
+                    <div className="bg-slate-800 text-white rounded-xl shadow-2xl p-4 flex flex-col md:flex-row items-center gap-4 border border-slate-700 ring-4 ring-slate-800/20">
                         <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start border-b md:border-b-0 border-slate-700 pb-2 md:pb-0">
-                            <span className="font-bold whitespace-nowrap text-lg text-white">{selectedTestIds.size} Selected</span>
+                            <span className="font-bold whitespace-nowrap text-lg text-white flex items-center gap-2">
+                                <span className="bg-blue-600 text-xs px-2 py-0.5 rounded-full">{selectedTestIds.size}</span>
+                                <span className="hidden md:inline">Selected</span>
+                            </span>
                             <button onClick={clearSelection} className="text-xs text-slate-400 hover:text-white underline">Cancel</button>
                         </div>
                         
-                        <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 w-full">
-                            <input 
-                                type="number" placeholder="Set Day Price" 
-                                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 rounded text-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                                value={bulkValues.price} onChange={e => setBulkValues({...bulkValues, price: e.target.value})}
-                            />
-                            <input 
-                                type="number" placeholder="Set Night Price" 
-                                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 rounded text-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                                value={bulkValues.priceNight} onChange={e => setBulkValues({...bulkValues, priceNight: e.target.value})}
-                            />
-                            <input 
-                                type="number" placeholder="Set Day Comm" 
-                                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 rounded text-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                                value={bulkValues.commissionDay} onChange={e => setBulkValues({...bulkValues, commissionDay: e.target.value})}
-                            />
-                            <input 
-                                type="number" placeholder="Set Night Comm" 
-                                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 rounded text-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                                value={bulkValues.commissionNight} onChange={e => setBulkValues({...bulkValues, commissionNight: e.target.value})}
-                            />
+                        <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-3 w-full">
+                            <div className="relative">
+                                <span className="absolute left-2 top-1.5 text-xs text-slate-400 font-bold">D-Price</span>
+                                <input 
+                                    type="number" 
+                                    className="bg-slate-700 border-slate-600 text-white placeholder-slate-500 rounded text-sm px-3 pt-5 pb-1 w-full focus:ring-blue-500 focus:border-blue-500"
+                                    value={bulkValues.price} onChange={e => setBulkValues({...bulkValues, price: e.target.value})}
+                                />
+                            </div>
+                             <div className="relative">
+                                <span className="absolute left-2 top-1.5 text-xs text-indigo-300 font-bold">N-Price</span>
+                                <input 
+                                    type="number" 
+                                    className="bg-slate-700 border-slate-600 text-white placeholder-slate-500 rounded text-sm px-3 pt-5 pb-1 w-full focus:ring-blue-500 focus:border-blue-500"
+                                    value={bulkValues.priceNight} onChange={e => setBulkValues({...bulkValues, priceNight: e.target.value})}
+                                />
+                            </div>
+                             <div className="relative">
+                                <span className="absolute left-2 top-1.5 text-xs text-slate-400 font-bold">D-Comm</span>
+                                <input 
+                                    type="number"
+                                    className="bg-slate-700 border-slate-600 text-white placeholder-slate-500 rounded text-sm px-3 pt-5 pb-1 w-full focus:ring-blue-500 focus:border-blue-500"
+                                    value={bulkValues.commissionDay} onChange={e => setBulkValues({...bulkValues, commissionDay: e.target.value})}
+                                />
+                            </div>
+                             <div className="relative">
+                                <span className="absolute left-2 top-1.5 text-xs text-indigo-300 font-bold">N-Comm</span>
+                                <input 
+                                    type="number" 
+                                    className="bg-slate-700 border-slate-600 text-white placeholder-slate-500 rounded text-sm px-3 pt-5 pb-1 w-full focus:ring-blue-500 focus:border-blue-500"
+                                    value={bulkValues.commissionNight} onChange={e => setBulkValues({...bulkValues, commissionNight: e.target.value})}
+                                />
+                            </div>
                         </div>
 
                         <button 
                             onClick={handleBulkUpdate}
-                            className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-bold shadow-lg transition-transform transform active:scale-95"
+                            className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-bold shadow-lg transition-transform transform active:scale-95 whitespace-nowrap"
                         >
-                            Update
+                            Update All
                         </button>
                     </div>
                 </div>
