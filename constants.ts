@@ -3,29 +3,25 @@ import { TestCategory, AppSettings } from './types';
 import { REFERRING_DOCTORS } from './referringDoctors';
 
 // Increment this version whenever you make structural changes to DEFAULT_TEST_DATA
-export const DATA_VERSION = '2.2'; 
+export const DATA_VERSION = '2.3'; 
 
 export const DEFAULT_TEST_DATA: TestCategory[] = [
   {
-    category: 'CT SCAN - PLAIN',
+    category: 'CT SCAN',
     isMajor: true,
     tests: [
-      { id: 'ct1', name: 'CT Brain', price: 3000, priceNight: 3500, subcategory: 'Brain & Head', commissionDay: 100, commissionNight: 125 },
-      { id: 'ct2', name: 'CT PNS', price: 2500, priceNight: 3000, subcategory: 'Brain & Head', commissionDay: 0, commissionNight: 0 },
-      { id: 'ct3', name: 'CT Orbits', price: 3000, priceNight: 3500, subcategory: 'Brain & Head', commissionDay: 0, commissionNight: 0 },
-      { id: 'ct31', name: 'CT Abdomen - Plain', price: 4000, priceNight: 4500, subcategory: 'Body', commissionDay: 150, commissionNight: 175 },
-      { id: 'ct8', name: 'CT KUB', price: 3000, priceNight: 3500, subcategory: 'Body', commissionDay: 0, commissionNight: 0 },
+      // PLAIN Subcategory
+      { id: 'ct1', name: 'CT Brain', price: 3000, priceNight: 3500, subcategory: 'PLAIN', commissionDay: 100, commissionNight: 125 },
+      { id: 'ct2', name: 'CT PNS', price: 2500, priceNight: 3000, subcategory: 'PLAIN', commissionDay: 0, commissionNight: 0 },
+      { id: 'ct3', name: 'CT Orbits', price: 3000, priceNight: 3500, subcategory: 'PLAIN', commissionDay: 0, commissionNight: 0 },
+      { id: 'ct31', name: 'CT Abdomen', price: 4000, priceNight: 4500, subcategory: 'PLAIN', commissionDay: 150, commissionNight: 175 },
+      { id: 'ct8', name: 'CT KUB', price: 3000, priceNight: 3500, subcategory: 'PLAIN', commissionDay: 0, commissionNight: 0 },
+      // CONTRAST Subcategory
+      { id: 'ct32', name: 'CT Abdomen', price: 5000, priceNight: 5500, subcategory: 'CONTRAST', commissionDay: 150, commissionNight: 200 },
+      { id: 'ct15', name: 'CT Angio - Pulmonary', price: 6000, priceNight: 6500, subcategory: 'CONTRAST', commissionDay: 0, commissionNight: 0 },
+      { id: 'ct16', name: 'CT Angio - Cerebral', price: 6000, priceNight: 6500, subcategory: 'CONTRAST', commissionDay: 0, commissionNight: 0 },
+      { id: 'ct29', name: 'CT Urogram', price: 5500, priceNight: 6000, subcategory: 'CONTRAST', commissionDay: 0, commissionNight: 0 },
     ],
-  },
-  {
-    category: 'CT SCAN - CONTRAST',
-    isMajor: true,
-    tests: [
-      { id: 'ct32', name: 'CT Abdomen - Contrast', price: 5000, priceNight: 5500, subcategory: 'Body', commissionDay: 150, commissionNight: 200 },
-      { id: 'ct15', name: 'CT Angio - Pulmonary', price: 6000, priceNight: 6500, subcategory: 'Angiography', commissionDay: 0, commissionNight: 0 },
-      { id: 'ct16', name: 'CT Angio - Cerebral', price: 6000, priceNight: 6500, subcategory: 'Angiography', commissionDay: 0, commissionNight: 0 },
-      { id: 'ct29', name: 'CT Urogram', price: 5500, priceNight: 6000, subcategory: 'Special', commissionDay: 0, commissionNight: 0 },
-    ]
   },
   {
     category: 'XRAY',
