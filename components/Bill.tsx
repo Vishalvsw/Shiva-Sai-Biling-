@@ -146,10 +146,23 @@ const Bill: React.FC<BillProps> = ({
     const isSaveDisabled = items.length === 0 || patientDetails.name.trim() === '';
     const isAmountPaidDisabled = total >= settings.verificationThreshold && !isEditingArchivedBill;
 
-    // Helper to format test name
+    // Helper to format test name with shortcuts
     const getFormattedTestName = (item: BillItem) => {
         const category = testData.find(cat => cat.tests.some(t => t.id === item.id));
-        const catName = category ? category.category.toUpperCase() : '';
+        const originalCatName = category ? category.category.toUpperCase() : '';
+        
+        // Define shortcuts for main categories
+        const catShortcuts: {[key: string]: string} = {
+            'ULTRASONOGRAPHY': 'USG',
+            'CT SCAN': 'CT',
+            'LABORATORY': 'LAB',
+            'XRAY': 'X-RAY',
+            'CARDIAC': 'CARD',
+            'HEALTH PACKAGE': 'PKG',
+            'CT SCAN-DAY': 'CT', 
+        };
+
+        const catName = catShortcuts[originalCatName] || originalCatName;
         const subName = item.subcategory ? item.subcategory.toUpperCase() : '';
         const testName = item.name.toUpperCase();
         
