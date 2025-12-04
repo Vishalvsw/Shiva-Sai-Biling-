@@ -345,14 +345,13 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, nickna
     };
 
     // Shared Render Function for Test Row
-    // Changed from Component to render function to fix TS issues with `key` and prevent focus loss during editing
     const renderTestRow = (test: ExtendedTest, catIndex: number, testIndex: number) => {
         const isEditing = editingTestId === test.id;
         const isSelected = selectedTestIds.has(test.id);
         
         return (
             <tr key={test.id} className={`group transition-colors ${isEditing ? 'bg-blue-50' : isSelected ? 'bg-indigo-50/50' : 'hover:bg-slate-50'}`}>
-                <td className="px-6 py-4 text-center">
+                <td className="px-6 py-4 text-center w-12" onClick={e => e.stopPropagation()}>
                     <input type="checkbox" checked={isSelected} onChange={() => toggleTestSelection(test.id)} className="h-4 w-4 rounded border-slate-300 text-[#143A78] focus:ring-[#143A78] cursor-pointer" />
                 </td>
                 {isEditing ? (
@@ -434,7 +433,7 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, nickna
 
                         <div className="flex items-center gap-2">
                              <p className="text-slate-400 text-xs hidden md:block mr-2">
-                                Tip: Click <span className="inline-block bg-blue-50 text-blue-600 px-1 rounded font-bold">✎</span> to edit.
+                                Tip: Click row or <span className="inline-block bg-blue-50 text-blue-600 px-1 rounded font-bold">✎</span> to edit.
                             </p>
                             {viewMode === 'category' && (
                                 <button onClick={handleAddCategory} className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold shadow-sm text-sm flex items-center gap-2">
@@ -552,6 +551,7 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, nickna
                                         className="w-full border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 p-2"
                                         placeholder="e.g. ct50"
                                     />
+                                    <p className="text-xs text-slate-400 mt-1">Will be saved as uppercase automatically.</p>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-semibold text-slate-700 mb-1">Commission (₹)</label>

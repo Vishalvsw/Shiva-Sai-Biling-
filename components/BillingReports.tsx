@@ -238,11 +238,31 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, n
                 let label = item.name;
                 let commissionRate = item.activeCommission;
 
-                // Check if this test belongs to a nickname bundle
-                const matchedNickname = nicknames.find(n => n.testIds.includes(item.id));
+                // Smart Matching: Check if this test belongs to a known nickname
+                // We prioritize matching by ID, and if multiple nicknames contain this test, 
+                // we prefer one where the commission matches (if applicable) or default to the first found.
+                const matchedNickname = nicknames.find(n => {
+                    const hasTest = n.testIds.includes(item.id);
+                    if (!hasTest) return false;
+                    // Optional: stricter check to ensure commission matches nickname definition
+                    // return Math.abs(n.commission - item.activeCommission) < 0.1;
+                    return true;
+                });
+
                 if (matchedNickname) {
                     label = matchedNickname.name;
-                    commissionRate = matchedNickname.commission;
+                    // If the item commission matches the nickname commission (or is very close), use the nickname definition
+                    // This keeps the report consistent with the "Nickname" concept
+                    if (Math.abs(item.activeCommission - matchedNickname.commission) < 1) {
+                        commissionRate = matchedNickname.commission;
+                    } else {
+                        // If actual commission differs (e.g. override), still group under Nickname but use actual value?
+                        // User asked for "ct50 stands here ct branch test 50 commision".
+                        // So we stick to the nickname's commission rate for the "Rate" visual, but total should reflect reality?
+                        // Actually user said "Total is commission * no of cases". 
+                        // So we should track the rate.
+                        commissionRate = item.activeCommission; 
+                    }
                 }
 
                 if (!report[doctor].breakdownMap[label]) {
@@ -255,8 +275,7 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, n
                 }
 
                 report[doctor].breakdownMap[label].cases += 1;
-                // Accumulate total. Note: We use commissionRate * 1 for consistency with the requested formula.
-                report[doctor].breakdownMap[label].total += commissionRate;
+                report[doctor].breakdownMap[label].total += item.activeCommission; // Use actual commission from bill
             });
         });
 
@@ -419,56 +438,63 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, n
                     </div>
 
                     <div className="overflow-x-auto max-h-[600px]">
-                        <table className="min-w-full divide-y divide-slate-200">
+                        <table className="min-w-full divide-y divide-slate-200 border-separate border-spacing-0">
                              <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                                 <tr>
-                                    <th className="py-3 pl-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-[20%]">Doctor Name</th>
-                                    <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">No of Patients</th>
-                                    <th className="px-3 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-[25%]">Tests (Nicknames)</th>
-                                    <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">No of Cases</th>
-                                    <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider" title="Total Commission for specific test/nickname">Total (Comm x Cases)</th>
-                                    <th className="px-3 py-3 text-right text-xs font-bold text-[#143A78] uppercase tracking-wider">Grand Total Commission</th>
-                                    <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                                    <th className="py-3 pl-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-[20%] border-b border-slate-200">Doctor Name</th>
+                                    <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">No of Patients</th>
+                                    <th className="px-3 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-[25%] border-b border-slate-200">Tests (Nicknames)</th>
+                                    <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">No of Cases</th>
+                                    <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200" title="Total Commission for specific test/nickname">Total (Comm x Cases)</th>
+                                    <th className="px-3 py-3 text-right text-xs font-bold text-[#143A78] uppercase tracking-wider border-b border-slate-200">Grand Total Commission</th>
+                                    <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 bg-white">
+                            <tbody className="bg-white">
                                 {doctorReportData.length > 0 ? (
-                                    doctorReportData.map((docData) => (
+                                    doctorReportData.map((docData, docIndex) => (
                                         <React.Fragment key={docData.doctorName}>
+                                            {/* Separation row between different doctors for clarity */}
+                                            {docIndex > 0 && (
+                                                <tr className="bg-slate-50 h-2 border-t border-slate-300">
+                                                    <td colSpan={7}></td>
+                                                </tr>
+                                            )}
+                                            
                                             {docData.breakdown.map((item, index) => (
-                                                <tr key={`${docData.doctorName}-${item.name}`} className={`hover:bg-blue-50 transition-colors ${index === 0 ? 'border-t border-slate-200' : ''}`}>
-                                                    {/* Doctor Name - Only first row */}
-                                                    <td className="py-2 pl-4 text-sm font-medium text-slate-900 align-top">
+                                                <tr key={`${docData.doctorName}-${item.name}`} className={`hover:bg-blue-50 transition-colors`}>
+                                                    {/* Doctor Name - Only first row of the doctor's group */}
+                                                    <td className={`py-2 pl-4 text-sm font-bold text-slate-900 align-top ${index !== docData.breakdown.length - 1 ? 'border-none' : 'border-b border-slate-100'}`}>
                                                         {index === 0 ? docData.doctorName : ''}
                                                     </td>
                                                     
                                                     {/* No of Patients - Only first row */}
-                                                    <td className="px-3 py-2 text-sm text-slate-500 text-right align-top">
+                                                    <td className={`px-3 py-2 text-sm text-slate-500 text-right align-top font-medium ${index !== docData.breakdown.length - 1 ? 'border-none' : 'border-b border-slate-100'}`}>
                                                         {index === 0 ? docData.patientCount : ''}
                                                     </td>
 
                                                     {/* Tests/Nicknames - Every row */}
-                                                    <td className="px-3 py-2 text-sm text-slate-600 align-top font-medium">
+                                                    <td className="px-3 py-2 text-sm text-slate-600 align-top font-medium border-b border-slate-100 border-l border-slate-100">
                                                         {item.name}
                                                     </td>
 
                                                     {/* No of Cases - Every row */}
-                                                    <td className="px-3 py-2 text-sm text-slate-500 text-right align-top">
+                                                    <td className="px-3 py-2 text-sm text-slate-500 text-right align-top border-b border-slate-100">
                                                         {item.cases}
                                                     </td>
 
                                                     {/* Total (Comm * Cases) - Every row */}
-                                                    <td className="px-3 py-2 text-sm text-slate-600 text-right align-top font-semibold">
+                                                    <td className="px-3 py-2 text-sm text-slate-600 text-right align-top font-semibold border-b border-slate-100">
                                                         ₹{item.total.toLocaleString()}
                                                     </td>
 
                                                     {/* Grand Total - Only first row */}
-                                                    <td className="px-3 py-2 text-sm font-bold text-[#143A78] text-right align-top">
+                                                    <td className={`px-3 py-2 text-sm font-bold text-[#143A78] text-right align-top border-l border-slate-100 ${index !== docData.breakdown.length - 1 ? 'border-b-0' : 'border-b border-slate-100'}`}>
                                                         {index === 0 ? `₹${docData.grandTotalCommission.toLocaleString()}` : ''}
                                                     </td>
 
                                                     {/* Actions - Only first row */}
-                                                    <td className="px-3 py-2 text-right align-top">
+                                                    <td className={`px-3 py-2 text-right align-top ${index !== docData.breakdown.length - 1 ? 'border-none' : 'border-b border-slate-100'}`}>
                                                         {index === 0 && (
                                                             <button 
                                                                 onClick={() => setSelectedDoctor(docData.doctorName)}
@@ -480,7 +506,7 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, n
                                                     </td>
                                                 </tr>
                                             ))}
-                                            {/* Fallback if breakdown is empty (should ideally not happen if patient count > 0) */}
+                                            {/* Fallback if breakdown is empty */}
                                             {docData.breakdown.length === 0 && (
                                                 <tr className="border-t border-slate-200">
                                                      <td className="py-2 pl-4 text-sm font-medium text-slate-900">{docData.doctorName}</td>
