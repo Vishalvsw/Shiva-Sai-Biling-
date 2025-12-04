@@ -96,3 +96,10 @@ export interface AuditLogEntry {
     action: string;
     details: string;
 }
+
+export interface TestNickname {
+    id: string;
+    name: string;
+    commission: number;
+    testIds: string[];
+}

@@ -1,9 +1,11 @@
+
 import React, { useState, useMemo } from 'react';
-import { SavedBill, BillItem, TestCategory } from '../types';
+import { SavedBill, BillItem, TestCategory, TestNickname } from '../types';
 
 interface BillingReportsProps {
     savedBills: SavedBill[];
     testData: TestCategory[];
+    nicknames: TestNickname[];
     onBack: () => void;
 }
 
@@ -132,7 +134,7 @@ const DoctorStatementModal: React.FC<{
     );
 };
 
-const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, onBack }) => {
+const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, nicknames, onBack }) => {
     const [dateRange, setDateRange] = useState('all');
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [doctorFilter, setDoctorFilter] = useState('all');
@@ -201,24 +203,59 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, o
 
 
     const doctorReport = useMemo(() => {
-        const report: { [key: string]: { referrals: number; revenue: number; commission: number; tests: number } } = {};
+        const report: { 
+            [key: string]: { 
+                referrals: number; 
+                revenue: number; 
+                commission: number; 
+                cases: number;
+                nicknameCounts: Record<string, number>;
+            } 
+        } = {};
+
         activeBills.forEach(bill => {
             const doctor = bill.patientDetails.refdBy || 'Direct Walk-in';
-            if (!report[doctor]) report[doctor] = { referrals: 0, revenue: 0, commission: 0, tests: 0 };
+            if (!report[doctor]) {
+                report[doctor] = { referrals: 0, revenue: 0, commission: 0, cases: 0, nicknameCounts: {} };
+            }
             
-            report[doctor].referrals++;
+            report[doctor].referrals += 1; // 1 bill = 1 referral
             report[doctor].commission += bill.totalCommissionAmount;
             report[doctor].revenue += bill.totalAmount;
-            report[doctor].tests += bill.billItems.length;
+            report[doctor].cases += bill.billItems.length; // Total tests
+            
+            // Match bill items to nicknames
+            bill.billItems.forEach(item => {
+                // Find matching nickname
+                // Prioritize nickname where test ID matches
+                // If multiple nicknames have same test, we just pick the first one found in the nicknames array
+                // The prompt implies one test maps to one "nickname logic" or "tier"
+                const foundNickname = nicknames.find(n => n.testIds.includes(item.id));
+                const label = foundNickname ? foundNickname.name : item.name; // Use nickname if found, else test name
+                
+                report[doctor].nicknameCounts[label] = (report[doctor].nicknameCounts[label] || 0) + 1;
+            });
         });
-        const array = Object.entries(report).sort(([, a], [, b]) => b.commission - a.commission);
+
+        const array = Object.entries(report).map(([name, data]) => {
+            // Format nickname string: "CT50 (2), CT75 (5)"
+            const nicknameStr = Object.entries(data.nicknameCounts)
+                .map(([nick, count]) => `${nick} (${count})`)
+                .join(', ');
+
+            return {
+                name,
+                ...data,
+                nicknameDisplay: nicknameStr || '-'
+            };
+        }).sort((a, b) => b.commission - a.commission);
         
         // Filter by search term
         if (doctorSearchTerm.trim()) {
-            return array.filter(([name]) => name.toLowerCase().includes(doctorSearchTerm.toLowerCase()));
+            return array.filter((item) => item.name.toLowerCase().includes(doctorSearchTerm.toLowerCase()));
         }
         return array;
-    }, [activeBills, doctorSearchTerm]);
+    }, [activeBills, doctorSearchTerm, nicknames]);
 
     const getBillsForDoctor = (doctorName: string) => {
         return activeBills.filter(bill => (bill.patientDetails.refdBy || 'Direct Walk-in') === doctorName).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -358,25 +395,27 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, o
                              <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                                 <tr>
                                     <th className="py-3 pl-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Doctor Name</th>
-                                    <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Patients Referred</th>
-                                    <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Total Tests</th>
-                                    <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Total Billed</th>
-                                    <th className="px-3 py-3 text-right text-xs font-bold text-[#143A78] uppercase tracking-wider">Total Commission</th>
+                                    <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">No of Patients</th>
+                                    <th className="px-3 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-[30%]">Tests (Nicknames)</th>
+                                    <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">No of Cases</th>
+                                    <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Total</th>
+                                    <th className="px-3 py-3 text-right text-xs font-bold text-[#143A78] uppercase tracking-wider">Grand Total Commission</th>
                                     <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
                                 {doctorReport.length > 0 ? (
-                                    doctorReport.map(([name, data]) => (
-                                        <tr key={name} className="hover:bg-blue-50 transition-colors group">
-                                            <td className="py-4 pl-4 text-sm font-medium text-slate-900">{name}</td>
-                                            <td className="px-3 py-4 text-sm text-slate-500 text-right">{data.referrals}</td>
-                                            <td className="px-3 py-4 text-sm text-slate-500 text-right">{data.tests}</td>
-                                            <td className="px-3 py-4 text-sm text-slate-600 text-right">₹{data.revenue.toLocaleString()}</td>
-                                            <td className="px-3 py-4 text-sm font-bold text-[#143A78] text-right">₹{data.commission.toLocaleString()}</td>
+                                    doctorReport.map((row) => (
+                                        <tr key={row.name} className="hover:bg-blue-50 transition-colors group">
+                                            <td className="py-4 pl-4 text-sm font-medium text-slate-900">{row.name}</td>
+                                            <td className="px-3 py-4 text-sm text-slate-500 text-right">{row.referrals}</td>
+                                            <td className="px-3 py-4 text-sm text-slate-600 break-words">{row.nicknameDisplay}</td>
+                                            <td className="px-3 py-4 text-sm text-slate-500 text-right">{row.cases}</td>
+                                            <td className="px-3 py-4 text-sm text-slate-600 text-right">₹{row.revenue.toLocaleString()}</td>
+                                            <td className="px-3 py-4 text-sm font-bold text-[#143A78] text-right">₹{row.commission.toLocaleString()}</td>
                                             <td className="px-3 py-4 text-right">
                                                 <button 
-                                                    onClick={() => setSelectedDoctor(name)}
+                                                    onClick={() => setSelectedDoctor(row.name)}
                                                     className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 rounded hover:bg-blue-200 transition-colors opacity-80 group-hover:opacity-100"
                                                 >
                                                     View Statement
@@ -386,7 +425,7 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, o
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={6} className="py-8 text-center text-slate-400 italic">
+                                        <td colSpan={7} className="py-8 text-center text-slate-400 italic">
                                             No data found for the selected filters.
                                         </td>
                                     </tr>

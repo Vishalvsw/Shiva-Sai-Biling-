@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Test, PatientDetails, BillItem, PaymentDetails, User, SavedBill, AppSettings, TestCategory, AuditLogEntry } from './types';
+import { Test, PatientDetails, BillItem, PaymentDetails, User, SavedBill, AppSettings, TestCategory, AuditLogEntry, TestNickname } from './types';
 import { DEFAULT_TEST_DATA, DEFAULT_SETTINGS, DATA_VERSION } from './constants';
 import { USERS } from './users';
 import TestSelector from './components/TestSelector';
@@ -61,6 +61,11 @@ const App: React.FC = () => {
         }
         const saved = localStorage.getItem('appSettings');
         return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    });
+
+    const [nicknames, setNicknames] = useState<TestNickname[]>(() => {
+        const saved = localStorage.getItem('testNicknames');
+        return saved ? JSON.parse(saved) : [];
     });
 
     // --- BILLING STATE ---
@@ -130,6 +135,7 @@ const App: React.FC = () => {
     useEffect(() => { localStorage.setItem('appSettings', JSON.stringify(settings)); }, [settings]);
     useEffect(() => { localStorage.setItem('savedBills', JSON.stringify(savedBills)); }, [savedBills]);
     useEffect(() => { localStorage.setItem('auditLog', JSON.stringify(auditLog)); }, [auditLog]);
+    useEffect(() => { localStorage.setItem('testNicknames', JSON.stringify(nicknames)); }, [nicknames]);
 
     useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('patientDetails', JSON.stringify(patientDetails)); }, [patientDetails, viewMode, isEditingArchivedBill]);
     useEffect(() => { if(viewMode !== 'billing' || isEditingArchivedBill) return; localStorage.setItem('billItems', JSON.stringify(billItems)); }, [billItems, viewMode, isEditingArchivedBill]);
@@ -263,6 +269,12 @@ const App: React.FC = () => {
         );
         const newBillNumber = lastExistingBillNumber + 1;
 
+        // Force clear localStorage items immediately to prevent race conditions or persistence issues
+        localStorage.removeItem('billItems');
+        localStorage.removeItem('patientDetails');
+        localStorage.removeItem('paymentDetails');
+        localStorage.removeItem('totalDiscount');
+
         setBillItems([]);
         setPatientDetails({ name: '', age: '', sex: '', refdBy: '' });
         setTotalDiscount(0);
@@ -282,6 +294,13 @@ const App: React.FC = () => {
             if (billItems.length > 0) {
                 logAction('BILL_RESET_FORM', `Reset current bill form #${billNumber}.`);
             }
+            
+            // Force clear localStorage for current form state
+            localStorage.removeItem('billItems');
+            localStorage.removeItem('patientDetails');
+            localStorage.removeItem('paymentDetails');
+            localStorage.removeItem('totalDiscount');
+
             setBillItems([]);
             setPatientDetails({ name: '', age: '', sex: '', refdBy: '' });
             setTotalDiscount(0);
@@ -689,9 +708,9 @@ const App: React.FC = () => {
                  {viewMode === 'dashboard' && currentUser.role === 'admin' && (
                      <>
                         {adminView === 'main' && <AdminDashboard onSelectView={setAdminView} savedBills={savedBills} settings={settings} setSettings={setSettings} />}
-                        {adminView === 'reports' && <BillingReports savedBills={savedBills} testData={testData} onBack={() => setAdminView('main')} />}
+                        {adminView === 'reports' && <BillingReports savedBills={savedBills} testData={testData} nicknames={nicknames} onBack={() => setAdminView('main')} />}
                         {adminView === 'users' && <ManageUsers users={users} setUsers={setUsers} onBack={() => setAdminView('main')} />}
-                        {adminView === 'tests' && <ManageTests testData={testData} setTestData={setTestData} onBack={() => setAdminView('main')} />}
+                        {adminView === 'tests' && <ManageTests testData={testData} setTestData={setTestData} nicknames={nicknames} setNicknames={setNicknames} onBack={() => setAdminView('main')} />}
                         {adminView === 'backup' && <BackupRestore onBack={() => setAdminView('main')} />}
                         {adminView === 'settings' && <Settings settings={settings} setSettings={setSettings} onBack={() => setAdminView('main')} />}
                         {adminView === 'activity' && <ActivityLog auditLog={auditLog} onBack={() => setAdminView('main')} />}
