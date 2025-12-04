@@ -202,60 +202,88 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, n
     }, [activeBills]);
 
 
-    const doctorReport = useMemo(() => {
-        const report: { 
-            [key: string]: { 
-                referrals: number; 
-                revenue: number; 
-                commission: number; 
-                cases: number;
-                nicknameCounts: Record<string, number>;
-            } 
-        } = {};
+    // Breakdown Logic for Doctor Report Table
+    const doctorReportData = useMemo(() => {
+        interface NicknameBreakdown {
+            name: string;
+            cases: number;
+            commissionRate: number;
+            total: number;
+        }
+        
+        interface DoctorRowData {
+            doctorName: string;
+            patientCount: number;
+            grandTotalCommission: number;
+            breakdown: NicknameBreakdown[];
+        }
+
+        const report: Record<string, { patientSet: Set<number>, breakdownMap: Record<string, NicknameBreakdown> }> = {};
 
         activeBills.forEach(bill => {
             const doctor = bill.patientDetails.refdBy || 'Direct Walk-in';
+            
             if (!report[doctor]) {
-                report[doctor] = { referrals: 0, revenue: 0, commission: 0, cases: 0, nicknameCounts: {} };
+                report[doctor] = {
+                    patientSet: new Set(),
+                    breakdownMap: {}
+                };
             }
             
-            report[doctor].referrals += 1; // 1 bill = 1 referral
-            report[doctor].commission += bill.totalCommissionAmount;
-            report[doctor].revenue += bill.totalAmount;
-            report[doctor].cases += bill.billItems.length; // Total tests
-            
-            // Match bill items to nicknames
+            // Track unique patients (bills)
+            report[doctor].patientSet.add(bill.billNumber);
+
             bill.billItems.forEach(item => {
-                // Find matching nickname
-                // Prioritize nickname where test ID matches
-                // If multiple nicknames have same test, we just pick the first one found in the nicknames array
-                // The prompt implies one test maps to one "nickname logic" or "tier"
-                const foundNickname = nicknames.find(n => n.testIds.includes(item.id));
-                const label = foundNickname ? foundNickname.name : item.name; // Use nickname if found, else test name
-                
-                report[doctor].nicknameCounts[label] = (report[doctor].nicknameCounts[label] || 0) + 1;
+                // Determine grouping label and commission
+                let label = item.name;
+                let commissionRate = item.activeCommission;
+
+                // Check if this test belongs to a nickname bundle
+                const matchedNickname = nicknames.find(n => n.testIds.includes(item.id));
+                if (matchedNickname) {
+                    label = matchedNickname.name;
+                    commissionRate = matchedNickname.commission;
+                }
+
+                if (!report[doctor].breakdownMap[label]) {
+                    report[doctor].breakdownMap[label] = {
+                        name: label,
+                        cases: 0,
+                        commissionRate: commissionRate,
+                        total: 0
+                    };
+                }
+
+                report[doctor].breakdownMap[label].cases += 1;
+                // Accumulate total. Note: We use commissionRate * 1 for consistency with the requested formula.
+                report[doctor].breakdownMap[label].total += commissionRate;
             });
         });
 
-        const array = Object.entries(report).map(([name, data]) => {
-            // Format nickname string: "CT50 (2), CT75 (5)"
-            const nicknameStr = Object.entries(data.nicknameCounts)
-                .map(([nick, count]) => `${nick} (${count})`)
-                .join(', ');
+        // Convert Map to Array
+        const result: DoctorRowData[] = Object.entries(report).map(([docName, data]) => {
+            const breakdown = Object.values(data.breakdownMap).sort((a, b) => b.total - a.total); // Sort breakdown by highest total
+            const grandTotalCommission = breakdown.reduce((sum, item) => sum + item.total, 0);
 
             return {
-                name,
-                ...data,
-                nicknameDisplay: nicknameStr || '-'
+                doctorName: docName,
+                patientCount: data.patientSet.size,
+                grandTotalCommission,
+                breakdown
             };
-        }).sort((a, b) => b.commission - a.commission);
-        
-        // Filter by search term
+        });
+
+        // Sort doctors by highest commission
+        result.sort((a, b) => b.grandTotalCommission - a.grandTotalCommission);
+
+        // Filter by search
         if (doctorSearchTerm.trim()) {
-            return array.filter((item) => item.name.toLowerCase().includes(doctorSearchTerm.toLowerCase()));
+            return result.filter(row => row.doctorName.toLowerCase().includes(doctorSearchTerm.toLowerCase()));
         }
-        return array;
-    }, [activeBills, doctorSearchTerm, nicknames]);
+
+        return result;
+    }, [activeBills, nicknames, doctorSearchTerm]);
+
 
     const getBillsForDoctor = (doctorName: string) => {
         return activeBills.filter(bill => (bill.patientDetails.refdBy || 'Direct Walk-in') === doctorName).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -390,38 +418,86 @@ const BillingReports: React.FC<BillingReportsProps> = ({ savedBills, testData, n
                         </div>
                     </div>
 
-                    <div className="overflow-x-auto max-h-[500px]">
+                    <div className="overflow-x-auto max-h-[600px]">
                         <table className="min-w-full divide-y divide-slate-200">
                              <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                                 <tr>
-                                    <th className="py-3 pl-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Doctor Name</th>
+                                    <th className="py-3 pl-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-[20%]">Doctor Name</th>
                                     <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">No of Patients</th>
-                                    <th className="px-3 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-[30%]">Tests (Nicknames)</th>
+                                    <th className="px-3 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-[25%]">Tests (Nicknames)</th>
                                     <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">No of Cases</th>
-                                    <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Total</th>
+                                    <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider" title="Total Commission for specific test/nickname">Total (Comm x Cases)</th>
                                     <th className="px-3 py-3 text-right text-xs font-bold text-[#143A78] uppercase tracking-wider">Grand Total Commission</th>
                                     <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
-                                {doctorReport.length > 0 ? (
-                                    doctorReport.map((row) => (
-                                        <tr key={row.name} className="hover:bg-blue-50 transition-colors group">
-                                            <td className="py-4 pl-4 text-sm font-medium text-slate-900">{row.name}</td>
-                                            <td className="px-3 py-4 text-sm text-slate-500 text-right">{row.referrals}</td>
-                                            <td className="px-3 py-4 text-sm text-slate-600 break-words">{row.nicknameDisplay}</td>
-                                            <td className="px-3 py-4 text-sm text-slate-500 text-right">{row.cases}</td>
-                                            <td className="px-3 py-4 text-sm text-slate-600 text-right">₹{row.revenue.toLocaleString()}</td>
-                                            <td className="px-3 py-4 text-sm font-bold text-[#143A78] text-right">₹{row.commission.toLocaleString()}</td>
-                                            <td className="px-3 py-4 text-right">
-                                                <button 
-                                                    onClick={() => setSelectedDoctor(row.name)}
-                                                    className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 rounded hover:bg-blue-200 transition-colors opacity-80 group-hover:opacity-100"
-                                                >
-                                                    View Statement
-                                                </button>
-                                            </td>
-                                        </tr>
+                                {doctorReportData.length > 0 ? (
+                                    doctorReportData.map((docData) => (
+                                        <React.Fragment key={docData.doctorName}>
+                                            {docData.breakdown.map((item, index) => (
+                                                <tr key={`${docData.doctorName}-${item.name}`} className={`hover:bg-blue-50 transition-colors ${index === 0 ? 'border-t border-slate-200' : ''}`}>
+                                                    {/* Doctor Name - Only first row */}
+                                                    <td className="py-2 pl-4 text-sm font-medium text-slate-900 align-top">
+                                                        {index === 0 ? docData.doctorName : ''}
+                                                    </td>
+                                                    
+                                                    {/* No of Patients - Only first row */}
+                                                    <td className="px-3 py-2 text-sm text-slate-500 text-right align-top">
+                                                        {index === 0 ? docData.patientCount : ''}
+                                                    </td>
+
+                                                    {/* Tests/Nicknames - Every row */}
+                                                    <td className="px-3 py-2 text-sm text-slate-600 align-top font-medium">
+                                                        {item.name}
+                                                    </td>
+
+                                                    {/* No of Cases - Every row */}
+                                                    <td className="px-3 py-2 text-sm text-slate-500 text-right align-top">
+                                                        {item.cases}
+                                                    </td>
+
+                                                    {/* Total (Comm * Cases) - Every row */}
+                                                    <td className="px-3 py-2 text-sm text-slate-600 text-right align-top font-semibold">
+                                                        ₹{item.total.toLocaleString()}
+                                                    </td>
+
+                                                    {/* Grand Total - Only first row */}
+                                                    <td className="px-3 py-2 text-sm font-bold text-[#143A78] text-right align-top">
+                                                        {index === 0 ? `₹${docData.grandTotalCommission.toLocaleString()}` : ''}
+                                                    </td>
+
+                                                    {/* Actions - Only first row */}
+                                                    <td className="px-3 py-2 text-right align-top">
+                                                        {index === 0 && (
+                                                            <button 
+                                                                onClick={() => setSelectedDoctor(docData.doctorName)}
+                                                                className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded hover:bg-blue-200 transition-colors"
+                                                            >
+                                                                View Statement
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {/* Fallback if breakdown is empty (should ideally not happen if patient count > 0) */}
+                                            {docData.breakdown.length === 0 && (
+                                                <tr className="border-t border-slate-200">
+                                                     <td className="py-2 pl-4 text-sm font-medium text-slate-900">{docData.doctorName}</td>
+                                                     <td className="px-3 py-2 text-sm text-right text-slate-500">{docData.patientCount}</td>
+                                                     <td colSpan={3} className="px-3 py-2 text-sm text-slate-400 italic text-center">No commission data</td>
+                                                     <td className="px-3 py-2 text-sm font-bold text-right text-[#143A78]">₹0</td>
+                                                     <td className="px-3 py-2 text-right">
+                                                         <button 
+                                                            onClick={() => setSelectedDoctor(docData.doctorName)}
+                                                            className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded hover:bg-blue-200 transition-colors"
+                                                        >
+                                                            View Statement
+                                                        </button>
+                                                     </td>
+                                                </tr>
+                                            )}
+                                        </React.Fragment>
                                     ))
                                 ) : (
                                     <tr>
