@@ -216,7 +216,7 @@ const ManageTests: React.FC<ManageTestsProps> = ({ testData, setTestData, nickna
 
         const newNickname: TestNickname = {
             id: `nick-${Date.now()}`,
-            name: nicknameForm.name.trim(),
+            name: nicknameForm.name.trim().toUpperCase(),
             commission: parseFloat(nicknameForm.commission),
             testIds: nicknameForm.selectedTests.map(t => t.id)
         };
