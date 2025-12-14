@@ -59,11 +59,53 @@ const Bill: React.FC<BillProps> = ({
 }) => {
     // State to manage edit mode for archived bills (only for admins)
     const [isEditModeActive, setIsEditModeActive] = useState(false);
+    
+    // State to track which items are selected for printing/calculation
+    const [selectedForPrint, setSelectedForPrint] = useState<Set<string>>(new Set());
 
-    // Recalculate totals using the passed utility function
+    // Ensure all items are selected by default when they first appear
+    useEffect(() => {
+        setSelectedForPrint(prev => {
+            const next = new Set(prev);
+            let changed = false;
+            items.forEach(item => {
+                if (!next.has(item.id)) {
+                    next.add(item.id);
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [items]);
+
+    const togglePrintSelection = (id: string) => {
+        const next = new Set(selectedForPrint);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedForPrint(next);
+    };
+
+    const toggleAllPrintSelection = () => {
+        const allIds = items.map(i => i.id);
+        const allSelected = allIds.every(id => selectedForPrint.has(id));
+        
+        if (allSelected) {
+            setSelectedForPrint(new Set()); // Deselect all
+        } else {
+            setSelectedForPrint(new Set(allIds)); // Select all
+        }
+    };
+
+    // Filter items for Calculation and Print Rendering
+    // If an item is NOT selected for print, it is excluded from totals and print view.
+    const activePrintItems = useMemo(() => {
+        return items.filter(item => selectedForPrint.has(item.id));
+    }, [items, selectedForPrint]);
+
+    // Recalculate totals using the passed utility function based on ACTIVE items only
     const { subtotal, totalDiscountAmount, billDiscountAmount, total } = useMemo(() => { 
-        return calculateBillTotals(items, totalDiscount, patientDetails.refdBy);
-    }, [items, totalDiscount, patientDetails.refdBy, calculateBillTotals]);
+        return calculateBillTotals(activePrintItems, totalDiscount, patientDetails.refdBy);
+    }, [activePrintItems, totalDiscount, patientDetails.refdBy, calculateBillTotals]);
 
     const balanceDue = total - paymentDetails.amountPaid;
 
@@ -145,6 +187,7 @@ const Bill: React.FC<BillProps> = ({
     
     const isSaveDisabled = items.length === 0 || patientDetails.name.trim() === '';
     const isAmountPaidDisabled = total >= settings.verificationThreshold && !isEditingArchivedBill;
+    const isAllSelected = items.length > 0 && items.every(i => selectedForPrint.has(i.id));
 
     // Helper to format test name with shortcuts
     const getFormattedTestName = (item: BillItem) => {
@@ -303,6 +346,15 @@ const Bill: React.FC<BillProps> = ({
                     <table className="min-w-full divide-y divide-slate-300" aria-label="Bill Items">
                         <thead className="bg-slate-50 print:bg-white print:border-y-2 print:border-black">
                             <tr>
+                                <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-slate-900 sm:pl-6 print:hidden w-10">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={isAllSelected}
+                                        onChange={toggleAllPrintSelection}
+                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                        title="Select/Deselect All for Print"
+                                    />
+                                </th>
                                 <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-slate-900 sm:pl-6 print:py-2 print:pl-0">Test Name</th>
                                 <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900 print:py-2">Price</th>
                                 <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900 print:hidden">Discount (₹)</th>
@@ -315,52 +367,63 @@ const Bill: React.FC<BillProps> = ({
                         <tbody className="divide-y divide-slate-200 bg-white">
                             {items.length === 0 && (
                                 <tr>
-                                    <td colSpan={5} className="text-center py-10 text-slate-500 italic">No tests selected.</td>
+                                    <td colSpan={6} className="text-center py-10 text-slate-500 italic">No tests selected.</td>
                                 </tr>
                             )}
-                            {items.map((item) => (
-                                <tr key={item.id}>
-                                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-slate-900 sm:pl-6 print:py-1.5 print:pl-0">
-                                        {/* Use formatted test name */}
-                                        {getFormattedTestName(item)}
-                                    </td>
-                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right print:py-1.5">₹{item.price.toFixed(2)}</td>
-                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right print:hidden">
-                                        <div className="flex flex-col items-end">
-                                            <input
-                                                type="number"
-                                                aria-label={`Discount for ${item.name}`}
-                                                value={item.discount > 0 ? item.discount : ''}
-                                                onChange={(e) => {
-                                                    const discount = parseFloat(e.target.value) || 0;
-                                                    onItemDiscountChange(item.id, Math.max(0, Math.min(item.price, discount)));
-                                                }}
-                                                placeholder="0.00"
-                                                className="w-24 rounded-md border-slate-300 py-1 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
-                                                disabled={areInputsDisabled}
+                            {items.map((item) => {
+                                const isSelected = selectedForPrint.has(item.id);
+                                return (
+                                    <tr key={item.id} className={`${isSelected ? '' : 'print:hidden opacity-50 bg-slate-50'}`}>
+                                        <td className="py-4 pl-4 pr-3 text-sm sm:pl-6 print:hidden">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={isSelected}
+                                                onChange={() => togglePrintSelection(item.id)}
+                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                             />
-                                            {item.discount > 0 && (
-                                                <p className="text-xs text-slate-500 mt-1">
-                                                    Net: ₹{(item.price - item.discount).toFixed(2)}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </td>
-                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right print:py-1.5 print:pr-0">₹{(item.price - item.discount).toFixed(2)}</td>
-                                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 print:hidden">
-                                        <button 
-                                            onClick={() => onRemoveItem(item.id)} 
-                                            className="text-red-600 hover:text-red-900 disabled:text-slate-400 disabled:cursor-not-allowed"
-                                            disabled={areInputsDisabled}
-                                            aria-label={`Remove ${item.name} from bill`}
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                                            </svg>
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
+                                        </td>
+                                        <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-slate-900 sm:pl-6 print:py-1.5 print:pl-0">
+                                            {/* Use formatted test name */}
+                                            {getFormattedTestName(item)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right print:py-1.5">₹{item.price.toFixed(2)}</td>
+                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right print:hidden">
+                                            <div className="flex flex-col items-end">
+                                                <input
+                                                    type="number"
+                                                    aria-label={`Discount for ${item.name}`}
+                                                    value={item.discount > 0 ? item.discount : ''}
+                                                    onChange={(e) => {
+                                                        const discount = parseFloat(e.target.value) || 0;
+                                                        onItemDiscountChange(item.id, Math.max(0, Math.min(item.price, discount)));
+                                                    }}
+                                                    placeholder="0.00"
+                                                    className="w-24 rounded-md border-slate-300 py-1 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                                    disabled={areInputsDisabled}
+                                                />
+                                                {item.discount > 0 && (
+                                                    <p className="text-xs text-slate-500 mt-1">
+                                                        Net: ₹{(item.price - item.discount).toFixed(2)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </td>
+                                         <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500 text-right print:py-1.5 print:pr-0">₹{(item.price - item.discount).toFixed(2)}</td>
+                                        <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 print:hidden">
+                                            <button 
+                                                onClick={() => onRemoveItem(item.id)} 
+                                                className="text-red-600 hover:text-red-900 disabled:text-slate-400 disabled:cursor-not-allowed"
+                                                disabled={areInputsDisabled}
+                                                aria-label={`Remove ${item.name} from bill`}
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                                </svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
@@ -586,7 +649,7 @@ const Bill: React.FC<BillProps> = ({
                             </tr>
                         </thead>
                         <tbody>
-                            {items.map(item => (
+                            {activePrintItems.map(item => (
                                 <tr key={item.id}>
                                     <td className="py-0.5">{getFormattedTestName(item)}</td>
                                     <td className="text-right py-0.5">{(item.price - item.discount).toFixed(2)}</td>
@@ -605,7 +668,7 @@ const Bill: React.FC<BillProps> = ({
                             <tr className="font-bold border-t border-dashed border-black"><td className="pt-1">Grand Total:</td><td className="pt-1 text-right">₹{total.toFixed(2)}</td></tr>
                             <tr><td>Amount Paid:</td><td className="text-right">₹{paymentDetails.amountPaid.toFixed(2)}</td></tr>
                             <tr className="font-bold"><td className="pb-1">Balance Due:</td><td className="pb-1 text-right">₹{balanceDue.toFixed(2)}</td></tr>
-                            <tr className="border-t border-dashed border-black"><td className="pt-1">Total Items:</td><td className="pt-1 text-right">{items.length}</td></tr>
+                            <tr className="border-t border-dashed border-black"><td className="pt-1">Total Items:</td><td className="pt-1 text-right">{activePrintItems.length}</td></tr>
                         </tbody>
                     </table>
                 </div>
