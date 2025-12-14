@@ -167,6 +167,17 @@ const Bill: React.FC<BillProps> = ({
         });
     };
     
+    const handleDoctorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const docName = e.target.value;
+        const selectedDoc = settings.referringDoctors.find(d => d.name === docName);
+        
+        onPatientDetailsChange({
+            ...patientDetails,
+            refdBy: docName,
+            doctorPhone: selectedDoc?.phone || '' // Auto-fill phone if available
+        });
+    };
+
     const handlePaymentChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         onPaymentDetailsChange({
@@ -311,22 +322,49 @@ const Bill: React.FC<BillProps> = ({
                                 <option value="Other">Other</option>
                             </select>
                         </div>
+                        <div className="sm:col-span-4 md:col-span-2">
+                            <label htmlFor="phone" className="block text-sm font-medium text-slate-700">Patient Phone</label>
+                            <input 
+                                type="text" 
+                                name="phone" 
+                                id="phone" 
+                                value={patientDetails.phone || ''} 
+                                onChange={handleInputChange} 
+                                placeholder="Optional"
+                                className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" 
+                                disabled={areInputsDisabled}
+                            />
+                        </div>
                          <div className="sm:col-span-4 md:col-span-2">
                             <label htmlFor="refdBy" className="block text-sm font-medium text-slate-700">Referred by Dr.</label>
                             <select 
                                 name="refdBy" 
                                 id="refdBy" 
                                 value={patientDetails.refdBy} 
-                                onChange={handleInputChange} 
+                                onChange={handleDoctorChange} 
                                 className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
                                 disabled={areInputsDisabled}
                                 aria-label="Referred by Doctor"
                             >
                                 <option value="">Select a Doctor</option>
                                 {settings.referringDoctors.map(doctor => (
-                                    <option key={doctor} value={doctor}>{doctor}</option>
+                                    <option key={doctor.name} value={doctor.name}>{doctor.name}</option>
                                 ))}
                             </select>
+                        </div>
+                        {/* Doctor Phone (Auto-filled but editable) */}
+                        <div className="sm:col-span-4 md:col-span-2">
+                            <label htmlFor="doctorPhone" className="block text-sm font-medium text-slate-700">Doctor Phone</label>
+                            <input 
+                                type="text" 
+                                name="doctorPhone" 
+                                id="doctorPhone" 
+                                value={patientDetails.doctorPhone || ''} 
+                                onChange={handleInputChange} 
+                                placeholder="Auto-filled from settings"
+                                className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" 
+                                disabled={areInputsDisabled}
+                            />
                         </div>
                     </div>
                      {/* Print View: Patient Details Text */}
@@ -336,7 +374,9 @@ const Bill: React.FC<BillProps> = ({
                             <p><strong className="font-semibold text-slate-800">Date:</strong> {new Date().toLocaleDateString()}</p>
                             <p><strong className="font-semibold text-slate-800">Patient Name:</strong> {patientDetails.name}</p>
                             <p><strong className="font-semibold text-slate-800">Age / Sex:</strong> {patientDetails.age} / {patientDetails.sex}</p>
+                            {patientDetails.phone && <p><strong className="font-semibold text-slate-800">Patient Ph:</strong> {patientDetails.phone}</p>}
                             <p><strong className="font-semibold text-slate-800">Referred by Dr.:</strong> {patientDetails.refdBy || 'N/A'}</p>
+                            {patientDetails.doctorPhone && <p><strong className="font-semibold text-slate-800">Dr. Ph:</strong> {patientDetails.doctorPhone}</p>}
                         </div>
                     </div>
                 </div>
@@ -637,6 +677,7 @@ const Bill: React.FC<BillProps> = ({
                     <p>Date: {new Date().toLocaleDateString()}</p>
                     <p className="col-span-2">Patient: {patientDetails.name}</p>
                     <p>Age/Sex: {patientDetails.age}/{patientDetails.sex}</p>
+                    {patientDetails.phone && <p className="col-span-2">Ph: {patientDetails.phone}</p>}
                     <p>Refd By: {patientDetails.refdBy || 'N/A'}</p>
                 </div>
 

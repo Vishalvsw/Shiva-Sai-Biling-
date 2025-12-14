@@ -19,7 +19,9 @@ export interface PatientDetails {
     name: string;
     age: string;
     sex: 'Male' | 'Female' | 'Other' | '';
+    phone: string;
     refdBy: string;
+    doctorPhone?: string;
 }
 
 export interface BillItem extends Test {
@@ -79,12 +81,17 @@ export interface SavedBill {
     lastModifiedBy?: string;
 }
 
+export interface Doctor {
+    name: string;
+    phone: string;
+}
+
 export interface AppSettings {
     labName: string;
     labAddress: string;
     labContact: string;
     taxRate: number;
-    referringDoctors: string[];
+    referringDoctors: Doctor[];
     autoDeleteDays: number;
     verificationThreshold: number;
     currentShift: 'Day' | 'Night'; // Global toggle for current pricing mode

@@ -3,7 +3,7 @@ import { TestCategory, AppSettings } from './types';
 import { REFERRING_DOCTORS } from './referringDoctors';
 
 // Increment this version whenever you make structural changes to DEFAULT_TEST_DATA
-export const DATA_VERSION = '2.3'; 
+export const DATA_VERSION = '2.4'; 
 
 export const DEFAULT_TEST_DATA: TestCategory[] = [
   {

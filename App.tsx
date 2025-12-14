@@ -56,10 +56,38 @@ const App: React.FC = () => {
     
     const [settings, setSettings] = useState<AppSettings>(() => {
         const savedVersion = localStorage.getItem('dataVersion');
+        const saved = localStorage.getItem('appSettings');
+        
+        // Intelligent Migration: If version changed (or first run), check if we can migrate old settings
         if (savedVersion !== DATA_VERSION) {
+            if (saved) {
+                try {
+                    const oldSettings = JSON.parse(saved);
+                    // Migrate doctors if they are just strings
+                    let newDoctors = DEFAULT_SETTINGS.referringDoctors;
+                    if (Array.isArray(oldSettings.referringDoctors) && typeof oldSettings.referringDoctors[0] === 'string') {
+                        newDoctors = oldSettings.referringDoctors.map((name: string) => ({ name, phone: '' }));
+                    } else if (Array.isArray(oldSettings.referringDoctors)) {
+                        // Assume they are already objects, but use them if valid
+                        newDoctors = oldSettings.referringDoctors;
+                    }
+
+                    return {
+                        ...DEFAULT_SETTINGS,
+                        labName: oldSettings.labName || DEFAULT_SETTINGS.labName,
+                        labAddress: oldSettings.labAddress || DEFAULT_SETTINGS.labAddress,
+                        labContact: oldSettings.labContact || DEFAULT_SETTINGS.labContact,
+                        referringDoctors: newDoctors,
+                        autoDeleteDays: oldSettings.autoDeleteDays || DEFAULT_SETTINGS.autoDeleteDays,
+                        verificationThreshold: oldSettings.verificationThreshold || DEFAULT_SETTINGS.verificationThreshold
+                    };
+                } catch (e) {
+                    console.error("Migration failed, using defaults", e);
+                    return DEFAULT_SETTINGS;
+                }
+            }
             return DEFAULT_SETTINGS;
         }
-        const saved = localStorage.getItem('appSettings');
         return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
     });
 
@@ -71,7 +99,7 @@ const App: React.FC = () => {
     // --- BILLING STATE ---
     const [patientDetails, setPatientDetails] = useState<PatientDetails>(() => {
         const saved = localStorage.getItem('patientDetails');
-        return saved ? JSON.parse(saved) : { name: '', age: '', sex: '', refdBy: '' };
+        return saved ? JSON.parse(saved) : { name: '', age: '', sex: '', phone: '', refdBy: '', doctorPhone: '' };
     });
 
     const [billItems, setBillItems] = useState<BillItem[]>(() => {
@@ -276,7 +304,7 @@ const App: React.FC = () => {
         localStorage.removeItem('totalDiscount');
 
         setBillItems([]);
-        setPatientDetails({ name: '', age: '', sex: '', refdBy: '' });
+        setPatientDetails({ name: '', age: '', sex: '', phone: '', refdBy: '', doctorPhone: '' });
         setTotalDiscount(0);
         setPaymentDetails({ paymentMethod: '', amountPaid: 0 });
         setBillNumber(newBillNumber);
@@ -302,7 +330,7 @@ const App: React.FC = () => {
             localStorage.removeItem('totalDiscount');
 
             setBillItems([]);
-            setPatientDetails({ name: '', age: '', sex: '', refdBy: '' });
+            setPatientDetails({ name: '', age: '', sex: '', phone: '', refdBy: '', doctorPhone: '' });
             setTotalDiscount(0);
             setPaymentDetails({ paymentMethod: '', amountPaid: 0 });
             setIsEditingArchivedBill(false);

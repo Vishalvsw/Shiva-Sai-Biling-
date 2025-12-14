@@ -10,7 +10,7 @@ interface SettingsProps {
 
 const Settings: React.FC<SettingsProps> = ({ settings, setSettings, onBack }) => {
     const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
-    const [newDoctor, setNewDoctor] = useState('');
+    const [newDoctor, setNewDoctor] = useState({ name: '', phone: '' });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value, type } = e.target;
@@ -22,14 +22,20 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, onBack }) =>
 
     const handleAddDoctor = (e: React.FormEvent) => {
         e.preventDefault();
-        if (newDoctor.trim() && !localSettings.referringDoctors.includes(newDoctor.trim())) {
-            setLocalSettings(prev => ({ ...prev, referringDoctors: [...prev.referringDoctors, newDoctor.trim()]}));
-            setNewDoctor('');
+        const trimmedName = newDoctor.name.trim();
+        if (trimmedName && !localSettings.referringDoctors.some(d => d.name === trimmedName)) {
+            setLocalSettings(prev => ({ 
+                ...prev, 
+                referringDoctors: [...prev.referringDoctors, { name: trimmedName, phone: newDoctor.phone.trim() }]
+            }));
+            setNewDoctor({ name: '', phone: '' });
+        } else if (localSettings.referringDoctors.some(d => d.name === trimmedName)) {
+            alert('Doctor already exists.');
         }
     };
     
-    const handleRemoveDoctor = (doctor: string) => {
-        setLocalSettings(prev => ({ ...prev, referringDoctors: prev.referringDoctors.filter(d => d !== doctor)}));
+    const handleRemoveDoctor = (doctorName: string) => {
+        setLocalSettings(prev => ({ ...prev, referringDoctors: prev.referringDoctors.filter(d => d.name !== doctorName)}));
     };
     
     const toggleShift = () => {
@@ -95,15 +101,19 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, onBack }) =>
                 {/* Referring Doctors */}
                 <div className="space-y-4 border-b pb-6">
                     <h3 className="text-xl font-bold text-slate-800">Referring Doctors</h3>
-                    <form onSubmit={handleAddDoctor} className="flex gap-2">
-                        <input type="text" value={newDoctor} onChange={e => setNewDoctor(e.target.value)} placeholder="Add new doctor name" className="flex-grow block w-full rounded-md border-slate-300 shadow-sm" />
-                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-[#143A78] rounded-lg hover:bg-blue-900">Add</button>
+                    <form onSubmit={handleAddDoctor} className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <input type="text" value={newDoctor.name} onChange={e => setNewDoctor({...newDoctor, name: e.target.value})} placeholder="Doctor Name" className="block w-full rounded-md border-slate-300 shadow-sm" required />
+                        <input type="text" value={newDoctor.phone} onChange={e => setNewDoctor({...newDoctor, phone: e.target.value})} placeholder="Phone Number (Optional)" className="block w-full rounded-md border-slate-300 shadow-sm" />
+                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-[#143A78] rounded-lg hover:bg-blue-900 w-full md:w-auto">Add Doctor</button>
                     </form>
-                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                         {localSettings.referringDoctors.map(doc => (
-                            <div key={doc} className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-200">
-                                <span className="text-sm font-medium text-slate-700">{doc}</span>
-                                <button onClick={() => handleRemoveDoctor(doc)} className="text-red-500 hover:text-red-700 px-2">&times;</button>
+                            <div key={doc.name} className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-200">
+                                <div>
+                                    <span className="text-sm font-medium text-slate-700 block">{doc.name}</span>
+                                    {doc.phone && <span className="text-xs text-slate-500">{doc.phone}</span>}
+                                </div>
+                                <button onClick={() => handleRemoveDoctor(doc.name)} className="text-red-500 hover:text-red-700 px-2 font-bold">&times;</button>
                             </div>
                         ))}
                     </div>
